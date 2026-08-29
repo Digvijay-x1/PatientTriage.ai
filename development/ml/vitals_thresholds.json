@@ -1,0 +1,276 @@
+{
+  "pediatric": {
+    "age_range": "0-12",
+
+    "normal_ranges": {
+      "respiratory_rate": {
+        "critical": ">50",
+        "urgent": "40-50",
+        "normal": "25-40",
+        "note": "Children breathe faster than adults"
+      },
+
+      "heart_rate": {
+        "critical": ">160 or <70",
+        "urgent": "120-160 or 70-90",
+        "normal": "90-120",
+        "note": "HR varies significantly by age"
+      },
+
+      "spo2": {
+        "critical": "<90%",
+        "urgent": "90-93%",
+        "normal": ">94%",
+        "note": "Lower SpO2 threshold than adults"
+      },
+
+      "systolic_bp": {
+        "method": "AAP_2017_SCREENING",
+        "note": "Pediatric BP is handled separately using age- and sex-specific AAP screening thresholds. Do not use the generic range parser."
+      },
+
+      "diastolic_bp": {
+        "method": "AAP_2017_SCREENING",
+        "note": "Pediatric DBP is handled together with SBP using the AAP screening table."
+      },
+
+      "temperature": {
+        "critical": ">40.0°C",
+        "urgent": "39.0-40.0°C",
+        "normal": "<39.0°C",
+        "note": "Children tolerate fever differently; clinical context is important."
+      },
+
+      "pain": {
+        "critical": "8-10",
+        "urgent": "5-7",
+        "normal": "0-4",
+        "note": "Numeric pain score on a 0-10 scale; clinical context is required, especially in children."
+      }
+    },
+
+    "blood_pressure_screening": {
+      "source": "American Academy of Pediatrics 2017 Clinical Practice Guideline",
+      "purpose": "SCREENING_ONLY",
+      "age_range": "1-12",
+      "unit": "mmHg",
+
+      "note": "These simplified values identify pediatric BP measurements requiring further evaluation. They are not diagnostic thresholds for hypertension.",
+
+      "thresholds": {
+        "male": {
+          "1": {
+            "systolic_bp": 98,
+            "diastolic_bp": 52
+          },
+          "2": {
+            "systolic_bp": 100,
+            "diastolic_bp": 55
+          },
+          "3": {
+            "systolic_bp": 101,
+            "diastolic_bp": 58
+          },
+          "4": {
+            "systolic_bp": 102,
+            "diastolic_bp": 60
+          },
+          "5": {
+            "systolic_bp": 103,
+            "diastolic_bp": 63
+          },
+          "6": {
+            "systolic_bp": 105,
+            "diastolic_bp": 66
+          },
+          "7": {
+            "systolic_bp": 106,
+            "diastolic_bp": 68
+          },
+          "8": {
+            "systolic_bp": 107,
+            "diastolic_bp": 69
+          },
+          "9": {
+            "systolic_bp": 107,
+            "diastolic_bp": 70
+          },
+          "10": {
+            "systolic_bp": 108,
+            "diastolic_bp": 72
+          },
+          "11": {
+            "systolic_bp": 110,
+            "diastolic_bp": 74
+          },
+          "12": {
+            "systolic_bp": 113,
+            "diastolic_bp": 75
+          }
+        },
+
+        "female": {
+          "1": {
+            "systolic_bp": 98,
+            "diastolic_bp": 54
+          },
+          "2": {
+            "systolic_bp": 101,
+            "diastolic_bp": 58
+          },
+          "3": {
+            "systolic_bp": 102,
+            "diastolic_bp": 60
+          },
+          "4": {
+            "systolic_bp": 103,
+            "diastolic_bp": 62
+          },
+          "5": {
+            "systolic_bp": 104,
+            "diastolic_bp": 64
+          },
+          "6": {
+            "systolic_bp": 105,
+            "diastolic_bp": 67
+          },
+          "7": {
+            "systolic_bp": 106,
+            "diastolic_bp": 68
+          },
+          "8": {
+            "systolic_bp": 107,
+            "diastolic_bp": 69
+          },
+          "9": {
+            "systolic_bp": 108,
+            "diastolic_bp": 71
+          },
+          "10": {
+            "systolic_bp": 109,
+            "diastolic_bp": 72
+          },
+          "11": {
+            "systolic_bp": 111,
+            "diastolic_bp": 74
+          },
+          "12": {
+            "systolic_bp": 114,
+            "diastolic_bp": 75
+          }
+        }
+      }
+    },
+
+    "clinical_context": "Fever is common in children; behavior, hydration, respiratory effort, and overall clinical appearance are important. Pediatric BP requires separate age- and sex-specific screening."
+  },
+
+  "adult": {
+    "age_range": "13-64",
+
+    "normal_ranges": {
+      "respiratory_rate": {
+        "critical": ">30",
+        "urgent": "25-30",
+        "normal": "12-20"
+      },
+
+      "heart_rate": {
+        "critical": ">130 or <50",
+        "urgent": "100-130 or 50-60",
+        "normal": "60-100"
+      },
+
+      "spo2": {
+        "critical": "<94%",
+        "urgent": "94-96%",
+        "normal": ">96%"
+      },
+
+      "systolic_bp": {
+        "critical": ">180 or <90",
+        "urgent": "160-180 or 90-100",
+        "normal": "100-160"
+      },
+
+      "diastolic_bp": {
+        "critical": ">120 or <60",
+        "urgent": "100-120 or 60-65",
+        "normal": "65-100",
+        "note": "Prototype DBP thresholds; clinical context is required."
+      },
+
+      "temperature": {
+        "critical": ">39.5°C",
+        "urgent": "38.5-39.5°C",
+        "normal": "<38.5°C"
+      },
+
+      "pain": {
+        "critical": "8-10",
+        "urgent": "5-7",
+        "normal": "0-4",
+        "note": "Numeric pain score on a 0-10 scale; pain severity should be interpreted with clinical context."
+      }
+    },
+
+    "clinical_context": "Standard adult thresholds. Elevated BP or HR may be influenced by anxiety or pain."
+  },
+
+  "geriatric": {
+    "age_range": "65+",
+
+    "normal_ranges": {
+      "respiratory_rate": {
+        "critical": ">30",
+        "urgent": "25-30",
+        "normal": "12-22",
+        "note": "Slightly higher than adult"
+      },
+
+      "heart_rate": {
+        "critical": ">110 or <50",
+        "urgent": "90-110 or 50-60",
+        "normal": "60-90",
+        "note": "Resting HR may be lower"
+      },
+
+      "spo2": {
+        "critical": "<92%",
+        "urgent": "92-94%",
+        "normal": ">94%",
+        "note": "Lower baseline SpO2 can occur; clinical context is important."
+      },
+
+      "systolic_bp": {
+        "critical": ">180 or <100",
+        "urgent": "160-180 or 100-110",
+        "normal": "110-170",
+        "note": "Lower BP tolerance; orthostatic hypotension risk"
+      },
+
+      "diastolic_bp": {
+        "critical": ">120 or <60",
+        "urgent": "100-120 or 60-65",
+        "normal": "65-100",
+        "note": "Prototype DBP thresholds; clinical context is required."
+      },
+
+      "temperature": {
+        "critical": ">38.5°C",
+        "urgent": "38.0-38.5°C",
+        "normal": "<38.0°C",
+        "note": "Older adults may have a reduced fever response; clinical context is important."
+      },
+
+      "pain": {
+        "critical": "8-10",
+        "urgent": "5-7",
+        "normal": "0-4",
+        "note": "Numeric pain score on a 0-10 scale; clinical context is required."
+      }
+    },
+
+    "clinical_context": "Older adults can present atypically. Vague symptoms combined with abnormal vital signs require careful clinical evaluation."
+  }
+}
