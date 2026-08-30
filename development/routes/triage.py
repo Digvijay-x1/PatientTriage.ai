@@ -50,16 +50,26 @@ def assess_triage():
         # Run Kavya's ML model. The service wrapper converts the DB Patient
         # record into Kavya's expected patient_dict schema.
         assessment_result = run_triage_assessment(patient)
-        
-        # Store assessment in DB
+
+        ai_confidence = assessment_result.get('confidence')
+
+        if ai_confidence is None:
+            ai_confidence = 0.0
+
         assessment = TriageAssessment(
             patient_id=patient.id,
             ai_esi_level=assessment_result['esi_level'],
-            ai_confidence=assessment_result['confidence'],
+            ai_confidence=ai_confidence,
             confidence_band=assessment_result['confidence_band'],
-            ai_reasoning=json.dumps(assessment_result['reasoning']),
-            auto_escalate_for_review=assessment_result['auto_escalate_for_coordinator_review'],
-            vital_details=json.dumps(assessment_result.get('vital_details', {}))
+            ai_reasoning=json.dumps(
+                assessment_result['reasoning']
+            ),
+            auto_escalate_for_review=assessment_result[
+                'auto_escalate_for_coordinator_review'
+            ],
+            vital_details=json.dumps(
+                assessment_result.get('vital_details', {})
+            )
         )
         
         db.session.add(assessment)
@@ -71,8 +81,10 @@ def assess_triage():
             event_type='assessment',
             timestamp=datetime.utcnow(),
             ai_esi=assessment_result['esi_level'],
-            ai_confidence=assessment_result['confidence'],
-            ai_reasoning=json.dumps(assessment_result['reasoning'])
+            ai_confidence=ai_confidence,
+            ai_reasoning=json.dumps(
+                assessment_result['reasoning']
+            )
         )
         
         db.session.add(audit_log)

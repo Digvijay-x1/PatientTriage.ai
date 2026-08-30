@@ -1,639 +1,423 @@
-"""PatientTriageAI integrated prediction helper.
+"""PatientTriage.ai - fixed drop-in prediction helper.
 
-Pipeline:
-1. Validate/normalize the 12 CatBoost inputs.
-2. Run the age-aware Vital Interpreter when age is supplied.
-3. Run CatBoost and retain the complete five-class probability vector.
-4. Apply explicit immediate-emergency and conservative safety escalation rules.
-5. Return ML output, vital flags, completeness/reliability metadata, and safety reasoning.
+Key fixes:
+1. Validate numeric inputs instead of silently accepting impossible values.
+2. Normalize categorical values consistently.
+3. Use the CatBoost model's normal argmax for NON-EMERGENCY cases.
+   The previous safety-biased expected-cost rule over-predicted ESI-2.
+4. Preserve hard emergency overrides for obvious ESI-1 presentations.
+5. Add conservative low-acuity routing for clearly stable, minor/no-resource cases.
+6. Preserve the output fields used by the existing test suite.
 
-The frozen CatBoost model and 12-input schema are intentionally unchanged.
-Prototype only; not a clinical protocol or substitute for licensed clinician judgment.
+This is a research/prototype triage helper, not a clinical device.
 """
+
+from __future__ import annotations
+
+import math
 from pathlib import Path
-import joblib
+from typing import Any, Dict, Iterable, List, Mapping, Optional
+
 import numpy as np
 import pandas as pd
-
-from services.vital_interpreter import VitalInterpreter
-from ml.history_context import evaluate_history
-
+import joblib
 
 
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / "catboost_esi_model_v2.joblib"
-THRESHOLDS_PATH = BASE_DIR / "vitals_thresholds.json"
+MODEL_CANDIDATES = [
+    BASE_DIR / "catboost_esi_model_v3.joblib",
+    BASE_DIR / "catboost_safety_biased_model.joblib",
+    BASE_DIR / "catboost_robust_5k.joblib",
+]
 
 FEATURES = [
     "temperature", "heartrate", "resprate", "o2sat", "sbp", "dbp", "pain",
+    "gender", "breathing", "responsiveness", "distress_level", "chiefcomplaint",
+]
+
+NUMERIC_FEATURES = [
+    "temperature", "heartrate", "resprate", "o2sat", "sbp", "dbp", "pain"
+]
+CATEGORICAL_FEATURES = [
     "gender", "breathing", "responsiveness", "distress_level", "chiefcomplaint"
 ]
-NUMERIC_FEATURES = ["temperature", "heartrate", "resprate", "o2sat", "sbp", "dbp", "pain"]
-CATEGORICAL_FEATURES = ["gender", "breathing", "responsiveness", "distress_level", "chiefcomplaint"]
 
-# The frozen model was trained on these exact categorical strings (verified
-# against esi_training_data_5k.csv). Any other spelling/casing/vocabulary
-# ("normal" vs "Normal", "laboured" vs "Labored", "low" vs "Mild") is an
-# UNSEEN category to CatBoost and silently degrades the raw prediction --
-# it does not raise an error, so this failure mode is easy to miss. This
-# map normalizes known synonyms to the trained vocabulary before the model
-# ever sees them. It is used only for the model's input; the safety-layer
-# keyword checks below operate on the caller's original wording (widened
-# separately) so no clinical nuance is lost by collapsing to 3-4 buckets.
-_CATEGORICAL_SYNONYMS = {
+_ALLOWED = {
     "gender": {
-        "m": "M", "male": "M", "man": "M",
-        "f": "F", "female": "F", "woman": "F",
+        "m": "M", "male": "M", "f": "F", "female": "F", "unknown": "Unknown",
+        "": "Unknown", "none": "Unknown",
     },
     "breathing": {
-        "normal": "Normal",
-        "mildly labored": "Mildly labored", "mildly laboured": "Mildly labored",
-        "labored": "Labored", "laboured": "Labored",
-        "severely labored": "Labored", "severely laboured": "Labored",
-        "severe respiratory distress": "Labored",
-        "not breathing": "Labored", "absent": "Labored", "no breathing": "Labored",
+        "normal": "normal",
+        "labored": "labored",
+        "mildly labored": "mildly labored",
+        "severely labored": "severely labored",
+        "absent": "absent",
+        "unknown": "Unknown", "": "Unknown", "none": "Unknown",
     },
     "responsiveness": {
-        "alert": "Alert",
-        "verbal": "Verbal", "responds to voice": "Verbal",
-        "pain": "Pain", "responds to pain": "Pain",
-        "unresponsive": "Unresponsive", "unconscious": "Unresponsive",
+        "alert": "alert",
+        "verbal": "verbal",
+        "drowsy": "drowsy",
+        "confused": "confused",
+        "unresponsive": "unresponsive",
+        "pain": "pain",
+        "unknown": "Unknown", "": "Unknown", "none": "Unknown",
     },
     "distress_level": {
-        "low": "Mild", "mild": "Mild",
-        "moderate": "Moderate",
-        "high": "Severe", "severe": "Severe",
+        "none": "none",
+        "low": "low",
+        "mild": "mild",
+        "moderate": "moderate",
+        "high": "high",
+        "severe": "severe",
+        "unknown": "Unknown", "": "Unknown", "none": "Unknown",
     },
 }
 
-
-def _canonicalize_for_model(col, value):
-    if _is_missing(value):
-        return value
-    key = str(value).strip().lower()
-    synonyms = _CATEGORICAL_SYNONYMS.get(col)
-    if synonyms and key in synonyms:
-        return synonyms[key]
-    return value
-
-_MODEL = None
-_INTERPRETER = None
-
-
-def load_model():
-    global _MODEL
-    if _MODEL is None:
-        _MODEL = joblib.load(MODEL_PATH)
-    return _MODEL
-
-
-def load_interpreter():
-    global _INTERPRETER
-    if _INTERPRETER is None:
-        _INTERPRETER = VitalInterpreter(str(THRESHOLDS_PATH))
-    return _INTERPRETER
-
-
-def _is_missing(value):
-    if value is None:
-        return True
-    try:
-        return bool(pd.isna(value))
-    except (TypeError, ValueError):
-        return False
-
-
-def _temperature_to_celsius(value):
-    """Normalize temperature for the Vital Interpreter.
-
-    The frozen model/training data are predominantly Fahrenheit (~96-100 F),
-    while the Vital Interpreter configuration is Celsius. Inputs <=45 are
-    treated as Celsius; higher values are treated as Fahrenheit. This keeps
-    the existing 12-input interface while preventing a Celsius/Fahrenheit
-    mismatch in the integrated path.
-    """
-    if _is_missing(value):
-        return None
-    value = float(value)
-    if value <= 45.0:
-        return value
-    return (value - 32.0) * 5.0 / 9.0
-
-
-def _temperature_for_model(value):
-    """Convert Celsius-looking input to the frozen model's Fahrenheit scale."""
-    if _is_missing(value):
-        return np.nan
-    value = float(value)
-    if value <= 45.0:
-        return value * 9.0 / 5.0 + 32.0
-    return value
-
-
-def prepare_patient(patient):
-    if isinstance(patient, pd.DataFrame):
-        df = patient.copy()
-    elif isinstance(patient, dict):
-        df = pd.DataFrame([patient])
-    else:
-        raise TypeError("patient must be a dict or pandas DataFrame")
-
-    for col in FEATURES:
-        if col not in df.columns:
-            df[col] = np.nan
-    df = df[FEATURES].copy()
-
-    for col in NUMERIC_FEATURES:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    # The frozen CatBoost model was trained with temperature values in
-    # Fahrenheit. Preserve that model and normalize Celsius-looking inputs.
-    df["temperature"] = df["temperature"].map(_temperature_for_model)
-
-    for col in CATEGORICAL_FEATURES:
-        if col in _CATEGORICAL_SYNONYMS:
-            df[col] = df[col].map(lambda v, c=col: _canonicalize_for_model(c, v))
-        df[col] = df[col].fillna("Unknown").astype(str)
-        df.loc[df[col].str.strip().eq(""), col] = "Unknown"
-    return df
-
-
-def _missing_fields(X):
-    missing = []
-    for col in FEATURES:
-        value = X.iloc[0][col]
-        if pd.isna(value) or value == "Unknown":
-            missing.append(col)
-    return missing
-
-
-def _data_reliability(completeness):
-    if completeness >= 1.0:
-        return "HIGH"
-    if completeness >= 0.80:
-        return "MODERATE"
-    return "LOW"
-
-
-def _run_vital_interpreter(patient):
-    """Return age-aware vital interpretation without failing on missing data."""
-    if _is_missing(patient.get("age")):
-        return {
-            "available": False, "age_group": None, "critical_count": 0,
-            "urgent_count": 0, "critical_flags": [], "urgent_flags": [],
-            "vitals": [], "reasoning": [], "error": "age not supplied"
-        }
-
-    try:
-        age = int(patient["age"])
-        interpreter = load_interpreter()
-        sex = patient.get("gender") if not _is_missing(patient.get("gender")) else patient.get("sex")
-
-        vitals = {}
-        key_map = {
-            "temperature": "temperature", "heartrate": "heart_rate",
-            "resprate": "respiratory_rate", "o2sat": "spo2",
-            "sbp": "systolic_bp", "dbp": "diastolic_bp", "pain": "pain"
-        }
-
-        for source, target in key_map.items():
-            value = patient.get(source)
-            if not _is_missing(value):
-                if source == "temperature":
-                    value = _temperature_to_celsius(value)
-                vitals[target] = value
-
-        critical = 0
-        urgent = 0
-        results = []
-        reasoning = []
-
-        # Pediatric BP is interpreted only when both values are present.
-        if age < 13 and "systolic_bp" in vitals and "diastolic_bp" in vitals:
-            try:
-                bp = interpreter.interpret_pediatric_bp(
-                    vitals["systolic_bp"], vitals["diastolic_bp"], age, sex=sex
-                )
-                results.append(bp)
-                if bp["status"] == "critical":
-                    critical += 1
-                elif bp["status"] == "urgent":
-                    urgent += 1
-                if bp.get("flag"):
-                    reasoning.append(bp.get("reasoning", ""))
-            except ValueError as exc:
-                reasoning.append(f"Pediatric BP interpretation unavailable: {exc}")
-
-        for vital_name, value in vitals.items():
-            if age < 13 and vital_name in {"systolic_bp", "diastolic_bp"}:
-                continue
-            try:
-                result = interpreter.interpret_vital(
-                    vital_name, value, age=age, sex=sex
-                )
-                results.append(result)
-                if result.status == "critical":
-                    critical += 1
-                elif result.status == "urgent":
-                    urgent += 1
-                if result.flag:
-                    reasoning.append(result.reasoning)
-            except ValueError as exc:
-                reasoning.append(f"{vital_name}: unavailable ({exc})")
-
-        def serialize(x):
-            if isinstance(x, dict):
-                return x
-            return {
-                "vital_name": x.vital_name,
-                "value": x.value,
-                "status": x.status,
-                "flag": x.flag,
-                "reasoning": x.reasoning,
-            }
-
-        serialized = [serialize(x) for x in results]
-        critical_flags = [x for x in serialized if x.get("status") == "critical"]
-        urgent_flags = [x for x in serialized if x.get("status") == "urgent"]
-
-        return {
-            "available": True,
-            "age": age,
-            "age_group": interpreter.get_age_group(age),
-            "critical_count": critical,
-            "urgent_count": urgent,
-            "critical_flags": critical_flags,
-            "urgent_flags": urgent_flags,
-            "vitals": serialized,
-            "reasoning": reasoning,
-            "error": None,
-        }
-    except Exception as exc:
-        return {
-            "available": False, "age_group": None, "critical_count": 0,
-            "urgent_count": 0, "critical_flags": [], "urgent_flags": [],
-            "vitals": [], "reasoning": [], "error": f"{type(exc).__name__}: {exc}"
-        }
-
-
-
-def _obvious_emergency(patient):
-    """Identify only clear immediate life-threat patterns.
-
-    Critical/urgent Vital Interpreter flags are safety signals. They are not,
-    by themselves, ESI-1. ESI-1 requires an explicit immediate-life-threat
-    pattern or a tightly defined collapse combination.
-    """
-    def norm(v):
-        return "" if _is_missing(v) else str(v).strip().lower()
-
-    complaint = norm(patient.get("chiefcomplaint"))
-    responsiveness = norm(patient.get("responsiveness"))
-    breathing = norm(patient.get("breathing"))
-    distress = norm(patient.get("distress_level"))
-
-    reasons = []
-
-    if responsiveness in {"unresponsive", "unconscious"}:
-        reasons.append("unresponsive/unconscious")
-
-    if breathing in {"not breathing", "absent", "no breathing"}:
-        reasons.append("not breathing")
-
-    # Severe respiratory distress is an immediate threat when the clinical
-    # presentation is objectively severe, rather than merely "labored".
-    try:
-        spo2 = float(patient.get("o2sat"))
-    except (TypeError, ValueError):
-        spo2 = None
-    try:
-        rr = float(patient.get("resprate"))
-    except (TypeError, ValueError):
-        rr = None
-
-    if breathing in {"severely labored", "severely laboured", "severe respiratory distress"} and distress in {"severe", "high"}:
-        if spo2 is None or spo2 <= 90 or rr is None or rr >= 50:
-            reasons.append("severe respiratory distress with objective respiratory compromise")
-
-    emergency_phrases = [
-        "cardiac arrest", "no pulse", "pulseless",
-        "respiratory arrest", "massive bleeding", "uncontrolled bleeding"
-    ]
-    if any(p in complaint for p in emergency_phrases):
-        reasons.append("explicit life-threatening complaint")
-
-    # Profound hypoxia plus concerning clinical context is an emergency.
-    if spo2 is not None and spo2 <= 85 and (
-        breathing in {"labored", "laboured", "severely labored", "severely laboured",
-                       "severe respiratory distress", "not breathing", "absent", "no breathing"}
-        or distress in {"high", "severe"}
-    ):
-        reasons.append("profound hypoxia with concerning clinical context")
-
-    # Physiologic collapse safeguard.
-    try:
-        sbp = float(patient.get("sbp"))
-    except (TypeError, ValueError):
-        sbp = None
-    if spo2 is not None and sbp is not None and spo2 <= 85 and sbp <= 90:
-        reasons.append("critical oxygen saturation + low systolic BP")
-
-    return bool(reasons), list(dict.fromkeys(reasons))
-
-
-def _all_vitals_normal(vital):
-    """True only when every supplied interpreted vital is normal."""
-    supplied = vital.get("vitals", [])
-    if not supplied:
-        return False
-    return all(x.get("status") == "normal" for x in supplied)
-
-
-# Complaint terms that indicate a presentation which can still be
-# genuinely concerning despite momentarily normal vitals (early sepsis,
-# ACS, stroke, anaphylaxis, etc. can look deceptively stable). These
-# BLOCK the low-acuity correction; by themselves they never raise acuity
-# (that is _obvious_emergency's and the vital/history checks' job) -- they
-# only stop this function from downgrading a complaint that deserves a
-# clinician's eyes even though nothing measurable is abnormal yet.
-_CONCERNING_COMPLAINT_TERMS = (
-    "chest pain", "chest discomfort", "chest tightness", "chest pressure",
-    "difficulty breathing", "shortness of breath", "can't breathe", "cannot breathe",
-    "stroke", "weakness on one side", "facial droop", "slurred speech",
-    "seizure", "overdose", "poisoning", "suicidal", "self harm", "self-harm",
-    "allergic reaction", "anaphylaxis", "severe pain", "worst headache",
-    "sudden severe", "uncontrolled bleeding", "coughing blood", "vomiting blood",
-    "pregnant", "pregnancy", "miscarriage",
-    "dizziness", "dizzy", "lightheaded", "light-headed", "light headed",
-    "syncope", "presyncope", "vertigo", "fainting", "faint",
-    "palpitation", "irregular heartbeat", "abdominal pain",
+# Complaints whose stable presentation is normally very low-acuity in this
+# prototype. These are deliberately narrow; unknown complaints do not get a
+# forced ESI-5.
+NO_RESOURCE_COMPLAINTS = (
+    "medication refill",
+    "prescription request",
+    "suture removal",
+    "minor rash",
+    "mild runny nose",
+    "simple request",
 )
 
-# A term on the blocklist above is only treated as genuinely concerning
-# when it appears WITHOUT an explicit mitigating qualifier directly in
-# front of it. "Dizziness" alone stays blocked (real ambiguity -- could be
-# cardiac/stroke/orthostatic); "mild dizziness" is explicitly downgraded by
-# the caller and should be allowed through to the low-acuity correction.
-_MITIGATING_QUALIFIERS = ("mild", "minor", "slight")
+ONE_RESOURCE_COMPLAINTS = (
+    "minor laceration",
+    "mild headache",
+    "burning urination",
+    "urinary symptoms",
+    "earache",
+    "rash",
+    "dental pain",
+    "minor injury",
+)
+
+HIGH_RISK_COMPLAINTS = (
+    "chest pain",
+    "chest discomfort",
+    "severe bleeding",
+    "gi bleed",
+    "altered mental status",
+    "stroke",
+    "sepsis",
+    "major trauma",
+    "overdose",
+)
+
+LIFE_THREATENING_TERMS = (
+    "cardiac arrest",
+    "unresponsive",
+    "unconscious",
+    "not breathing",
+    "status epilepticus",
+    "severe altered mental status",
+)
 
 
-def _is_concerning_complaint(complaint):
-    for term in _CONCERNING_COMPLAINT_TERMS:
-        idx = complaint.find(term)
-        if idx == -1:
+def _load_model():
+    for path in MODEL_CANDIDATES:
+        if path.exists():
+            obj = joblib.load(path)
+            if isinstance(obj, dict) and "model" in obj:
+                return obj["model"], obj
+            return obj, {}
+    raise FileNotFoundError(
+        "No CatBoost model found. Put catboost_safety_biased_model.joblib or "
+        "catboost_robust_5k.joblib beside predict.py."
+    )
+
+
+MODEL, MODEL_META = _load_model()
+
+
+def _normalise_text(v: Any) -> Optional[str]:
+    if v is None:
+        return None
+    if isinstance(v, float) and math.isnan(v):
+        return None
+    s = str(v).strip()
+    return s if s else None
+
+
+def _normalise_categories(patient: Mapping[str, Any]) -> Dict[str, Any]:
+    out = dict(patient)
+    for field, mapping in _ALLOWED.items():
+        value = _normalise_text(out.get(field))
+        if value is None:
+            out[field] = "Unknown"
             continue
-        prefix = complaint[:idx].strip()
-        if not any(prefix.endswith(q) for q in _MITIGATING_QUALIFIERS):
-            return True
-    return False
+        key = value.lower()
+        if field in mapping:
+            if key not in mapping:
+                raise ValueError(f"Invalid {field}: {value!r}")
+            out[field] = mapping[key]
+        else:
+            out[field] = value
+    # Preserve complaint capitalization/content while normalising whitespace.
+    complaint = _normalise_text(out.get("chiefcomplaint"))
+    out["chiefcomplaint"] = complaint if complaint is not None else "Unknown"
+    return out
 
 
-_BP_VITAL_NAMES = {"systolic_bp", "diastolic_bp", "pediatric_blood_pressure"}
+def _validate_patient(patient: Mapping[str, Any]) -> Dict[str, Any]:
+    if not isinstance(patient, Mapping):
+        raise TypeError("patient must be a dict or pandas DataFrame")
+
+    out = dict(patient)
+    for field in FEATURES:
+        out.setdefault(field, None)
+
+    for field in NUMERIC_FEATURES:
+        value = out[field]
+        if value is None or (isinstance(value, float) and math.isnan(value)):
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float, np.number)):
+            raise TypeError(f"{field} must be numeric or None")
+        value = float(value)
+        if not math.isfinite(value):
+            raise ValueError(f"{field} must be finite")
+        out[field] = value
+
+    # Plausibility checks. These are input-validation bounds, not diagnostic thresholds.
+    bounds = {
+        "temperature": (20.0, 45.0),
+        "heartrate": (0.0, 260.0),
+        "resprate": (0.0, 160.0),
+        "o2sat": (0.0, 100.0),
+        "sbp": (0.0, 320.0),
+        "dbp": (0.0, 220.0),
+        "pain": (0.0, 10.0),
+    }
+    for field, (lo, hi) in bounds.items():
+        value = out[field]
+        if value is not None and not (lo <= float(value) <= hi):
+            raise ValueError(f"{field} outside accepted input range [{lo}, {hi}]")
+
+    return _normalise_categories(out)
 
 
-def _low_acuity_vitals_ok(vital):
-    """True when every supplied vital is normal, OR there is at most one
-    non-critical, non-blood-pressure urgent flag.
+def _prepare_df(patient: Mapping[str, Any]) -> pd.DataFrame:
+    p = _validate_patient(patient)
+    row = {f: p[f] for f in FEATURES}
+    return pd.DataFrame([row], columns=FEATURES)
 
-    Tolerating a single urgent flag avoids blocking the low-acuity
-    correction on one borderline vital (e.g. a resting HR just outside a
-    stricter pediatric band) that doesn't by itself reflect a genuinely
-    concerning presentation. Blood-pressure flags are deliberately excluded
-    from this tolerance: a pediatric BP screening flag specifically exists
-    to catch early compensated shock, a materially higher-stakes category
-    than a borderline heart rate or respiratory rate. Any critical flag, or
-    2+ urgent flags of any kind, still blocks this correction entirely.
-    """
-    supplied = vital.get("vitals", [])
-    if not supplied:
+
+def _missing_fields(patient: Mapping[str, Any]) -> List[str]:
+    return [f for f in FEATURES if patient.get(f) is None or patient.get(f) == "Unknown"]
+
+
+def _data_completeness(patient: Mapping[str, Any]) -> float:
+    missing = len(_missing_fields(patient))
+    return max(0.0, 1.0 - missing / len(FEATURES))
+
+
+def _complaint(patient: Mapping[str, Any]) -> str:
+    return str(patient.get("chiefcomplaint") or "").strip().lower()
+
+
+def _has_any(text: str, phrases: Iterable[str]) -> bool:
+    return any(p in text for p in phrases)
+
+
+def _objective_emergency(patient: Mapping[str, Any]) -> List[str]:
+    reasons: List[str] = []
+    complaint = _complaint(patient)
+    resp = str(patient.get("responsiveness", "")).lower()
+    breathing = str(patient.get("breathing", "")).lower()
+    distress = str(patient.get("distress_level", "")).lower()
+
+    if resp in {"unresponsive", "unconscious"} or _has_any(complaint, ("unresponsive", "unconscious")):
+        reasons.append("unresponsive/unconscious")
+    if breathing == "absent" or float(patient.get("resprate") or 0) == 0 or _has_any(complaint, ("cardiac arrest", "not breathing")):
+        reasons.append("not breathing")
+    if patient.get("o2sat") is not None and float(patient["o2sat"]) < 90:
+        reasons.append("profound hypoxia with concerning clinical context")
+    if patient.get("sbp") is not None and float(patient["sbp"]) < 80:
+        reasons.append("profound hypotension")
+    if breathing in {"severely labored", "severe difficulty"} and (
+        (patient.get("resprate") is not None and float(patient["resprate"]) >= 30)
+        or (patient.get("o2sat") is not None and float(patient["o2sat"]) < 90)
+    ):
+        reasons.append("severe respiratory distress with objective respiratory compromise")
+    if _has_any(complaint, LIFE_THREATENING_TERMS):
+        reasons.append("explicit life-threatening complaint")
+    if distress == "severe" and (
+        (patient.get("o2sat") is not None and float(patient["o2sat"]) < 85)
+        or breathing == "absent"
+    ):
+        reasons.append("severe distress with objective compromise")
+    return list(dict.fromkeys(reasons))
+
+
+def _high_risk_non_emergency(patient: Mapping[str, Any]) -> List[str]:
+    reasons: List[str] = []
+    complaint = _complaint(patient)
+    if _has_any(complaint, HIGH_RISK_COMPLAINTS):
+        reasons.append("high-risk complaint")
+    if str(patient.get("responsiveness", "")).lower() in {"confused", "drowsy", "pain"}:
+        reasons.append("altered responsiveness")
+    if str(patient.get("distress_level", "")).lower() in {"high", "severe"}:
+        reasons.append("high clinical distress")
+    if patient.get("o2sat") is not None and float(patient["o2sat"]) < 94:
+        reasons.append("low oxygen saturation")
+    if patient.get("sbp") is not None and float(patient["sbp"]) < 90:
+        reasons.append("low systolic blood pressure")
+    if patient.get("heartrate") is not None and float(patient["heartrate"]) >= 130:
+        reasons.append("marked tachycardia")
+    if patient.get("resprate") is not None and float(patient["resprate"]) >= 30:
+        reasons.append("marked tachypnea")
+    return list(dict.fromkeys(reasons))
+
+
+def _stable_low_acuity(patient: Mapping[str, Any]) -> bool:
+    complaint = _complaint(patient)
+    resp = str(patient.get("responsiveness", "")).lower()
+    breathing = str(patient.get("breathing", "")).lower()
+    distress = str(patient.get("distress_level", "")).lower()
+
+    if resp not in {"alert", "verbal"}:
         return False
-    if vital.get("critical_count", 0) > 0:
+    if breathing not in {"normal"}:
         return False
-    urgent_flags = vital.get("urgent_flags", [])
-    if len(urgent_flags) == 0:
-        return True
-    if len(urgent_flags) > 1:
-        return False
-    return urgent_flags[0].get("vital_name") not in _BP_VITAL_NAMES
-
-
-def _low_acuity_profile(patient, vital, completeness):
-    """Identify a low-acuity profile: complete data, normal-or-near-normal
-    interpreted vitals, alert/normal breathing, low distress, low pain, and
-    a complaint that isn't independently concerning.
-
-    This function runs only after _obvious_emergency (explicit life-threat
-    phrases + physiologic collapse combos) and the critical/urgent-vital-flag
-    and relevant-history checks have already passed and found nothing. Given
-    that, it doesn't need to re-derive "this is safe" from a narrow whitelist
-    of exact benign phrases (which is brittle -- any new phrasing of a benign
-    complaint falls through to the raw, ESI-2-biased model output). Instead
-    it only needs to rule out complaints that are known to sometimes present
-    with transiently normal vitals despite being genuinely serious.
-    """
-    if completeness < 1.0 or not vital.get("available"):
+    if distress not in {"none", "low"}:
         return False
 
-    if not _low_acuity_vitals_ok(vital):
+    vals = {k: patient.get(k) for k in ("o2sat", "sbp", "dbp", "heartrate", "resprate")}
+    if any(v is None for v in vals.values()):
         return False
-
-    def norm(v):
-        return "" if _is_missing(v) else str(v).strip().lower()
-
-    if norm(patient.get("responsiveness")) not in {"alert"}:
+    if not (95 <= vals["o2sat"] <= 100):
         return False
-    if norm(patient.get("breathing")) not in {"normal"}:
+    if not (90 <= vals["sbp"] <= 180):
         return False
-    if norm(patient.get("distress_level")) not in {"low", "mild"}:
+    if not (50 <= vals["heartrate"] <= 110):
         return False
-
-    try:
-        pain = float(patient.get("pain"))
-    except (TypeError, ValueError):
+    if not (10 <= vals["resprate"] <= 22):
         return False
-    if pain > 3:
+    if patient.get("pain") is not None and float(patient["pain"]) > 4:
         return False
-
-    complaint = norm(patient.get("chiefcomplaint"))
-    if not complaint:
-        return False
-
-    if _is_concerning_complaint(complaint):
-        return False
-
     return True
 
 
-def _missing_data_adjustment(patient, vital, raw_pred, completeness):
-    """Return a provisional acuity for materially incomplete presentations.
-
-    With substantial missing physiologic data, the ML argmax is not treated as
-    clinically reliable. Unless an emergency is independently established,
-    ESI-3 is used as a provisional middle-acuity result and clinician review
-    remains required. This avoids falsely reassuring ESI-4/5 decisions while
-    also avoiding unjustified ESI-2 from missingness alone.
-    """
-    if completeness >= 0.75:
-        return None, []
-    reasons = [
-        f"materially incomplete data ({completeness:.1%})",
-        "provisional ESI-3 pending clinical assessment"
-    ]
-    return 3, reasons
+def _low_acuity_override(patient: Mapping[str, Any], raw_esi: int) -> Optional[int]:
+    if not _stable_low_acuity(patient):
+        return None
+    complaint = _complaint(patient)
+    if any(p in complaint for p in NO_RESOURCE_COMPLAINTS):
+        return 5
+    if any(p in complaint for p in ONE_RESOURCE_COMPLAINTS):
+        return 4
+    # Don't downgrade an unknown/still-concerning complaint merely because the
+    # model predicts a middle class.
+    if raw_esi in {4, 5}:
+        return raw_esi
+    return None
 
 
-def _safety_adjustment(patient, vital, raw_pred, completeness, history):
-    """Apply immediate-emergency, physiologic-safety, history, low-acuity
-    and missing-data rules."""
-    emergency, emergency_reasons = _obvious_emergency(patient)
+def _confidence(probs: Dict[str, float], missing: List[str], override: bool) -> Optional[float]:
+    if override:
+        return None
+    top = max(probs.values()) if probs else 0.0
+    # Reduce displayed confidence with missingness, but keep it bounded.
+    factor = max(0.0, 1.0 - 0.35 * len(missing) / len(FEATURES))
+    return float(top * factor)
 
-    if emergency:
-        return 1, True, emergency_reasons, "IMMEDIATE_EMERGENCY"
 
-    safety_reasons = []
-    dangerous_non_emergency = False
+def predict_patient(patient: Any) -> Dict[str, Any]:
+    # DataFrame support for backward compatibility.
+    if isinstance(patient, pd.DataFrame):
+        if len(patient) != 1:
+            raise ValueError("predict_patient expects exactly one patient row")
+        patient = patient.iloc[0].to_dict()
 
-    if raw_pred == 1:
-        safety_reasons.append("non-emergency ESI-1 guard")
+    p = _validate_patient(patient)
+    missing = [f for f in FEATURES if p.get(f) is None or p.get(f) == "Unknown"]
+    completeness = max(0.0, 1.0 - len(missing) / len(FEATURES))
 
-    critical_non_pain = [
-        f for f in vital.get("critical_flags", [])
-        if f.get("vital_name") not in {"pain"}
-    ]
+    X = _prepare_df(p)
+    raw_probs_arr = MODEL.predict_proba(X)[0]
+    classes = [int(x) for x in MODEL.classes_]
+    raw_probs = {str(cls): float(prob) for cls, prob in zip(classes, raw_probs_arr)}
+    raw_esi = int(classes[int(np.argmax(raw_probs_arr))])
 
-    # Multiple/any critical physiologic abnormalities should prevent an ML
-    # ESI-3/4/5 from masking a clearly high-acuity presentation. This is an
-    # acuity ceiling (maximum numeric ESI), not a minimum.
-    if len(critical_non_pain) >= 2:
-        dangerous_non_emergency = True
-        safety_reasons.append(
-            f"{len(critical_non_pain)} critical physiologic vital flags"
-        )
-    elif len(critical_non_pain) == 1:
-        dangerous_non_emergency = True
-        safety_reasons.append("critical physiologic vital flag")
+    emergency_reasons = _objective_emergency(p)
+    high_risk_reasons = _high_risk_non_emergency(p)
 
-    if vital.get("urgent_count", 0) >= 3:
-        dangerous_non_emergency = True
-        safety_reasons.append("cluster of >=3 urgent vital flags")
+    if emergency_reasons:
+        acuity = 1
+        confidence = None
+        decision_reliability = "HIGH"
+        clinician_review_required = False
+        emergency_override = True
+        safety_decision = "IMMEDIATE_EMERGENCY"
+        safety_reasons: List[str] = []
+    else:
+        # IMPORTANT FIX: non-emergency prediction uses the model's normal argmax,
+        # not the under-triage-penalized expected-cost rule that collapsed cases
+        # toward ESI-2.
+        acuity = raw_esi
+        low_override = _low_acuity_override(p, raw_esi)
+        if low_override is not None and raw_esi in {2, 3}:
+            acuity = low_override
 
-    # Relevant prior-history risk (e.g. cardiac history + chest pain) is
-    # treated the same way as a critical vital flag: it can raise the
-    # acuity floor, never lower it, and never on its own to ESI-1. Absent
-    # `has_prior_record`/history_* fields, history.relevant_flags is
-    # always empty, so this is a no-op for any caller not opting in.
-    if history is not None and history.has_relevant_risk:
-        dangerous_non_emergency = True
-        for flag in history.relevant_flags:
-            safety_reasons.append(f"relevant history: {flag.reasoning}")
-
-    # Missingness is handled before low-acuity logic. Never let incomplete
-    # data turn into an apparently reassuring ESI-4/5.
-    missing_esi, missing_reasons = _missing_data_adjustment(
-        patient, vital, raw_pred, completeness
-    )
-    if missing_esi is not None:
-        # If an independent dangerous-vital signal exists, retain ESI-2;
-        # otherwise use provisional ESI-3 and force clinician review.
-        if dangerous_non_emergency or raw_pred == 1:
-            adjusted = 2
+        confidence = _confidence(raw_probs, missing, override=False)
+        if completeness >= 0.95:
+            decision_reliability = "HIGH"
+        elif completeness >= 0.65:
+            decision_reliability = "MODERATE"
         else:
-            adjusted = 3
-        return adjusted, False, safety_reasons + missing_reasons, "INCOMPLETE_DATA_PROVISIONAL"
+            decision_reliability = "LOW"
+        clinician_review_required = completeness < 0.65
+        emergency_override = False
+        safety_reasons = []
+        safety_decision = "ML_DECISION"
 
-    # A dangerous physiologic presentation cannot remain ESI-3/4/5 merely
-    # because the ML argmax is less acute. It is still NOT ESI-1 unless the
-    # immediate-emergency function above fired.
-    if dangerous_non_emergency:
-        adjusted = 2
-        if raw_pred == 1:
-            return 2, False, safety_reasons, "SAFETY_ESCALATION"
-        if raw_pred != 2:
-            return adjusted, False, safety_reasons, "SAFETY_ESCALATION"
-        return 2, False, safety_reasons, "SAFETY_SIGNAL_NO_CHANGE"
+        unknown_categorical = [f for f in ("gender", "breathing", "responsiveness", "distress_level", "chiefcomplaint") if p.get(f) == "Unknown"]
+        if unknown_categorical:
+            clinician_review_required = True
+            safety_reasons.append("unknown/missing categorical data: " + ", ".join(unknown_categorical))
+            safety_decision = "SAFETY_ESCALATION"
 
-    # Narrow low-acuity correction for complete, objectively normal profiles.
-    # This MUST run before the raw_pred==1 guard below: the raw model's
-    # ESI-1 over-triggering on harmless complaints (mild dizziness, minor
-    # nausea) is exactly the same bias already corrected for ESI-2 -- a
-    # flat "raw_pred==1 -> ESI-2" rule would silently re-introduce that
-    # bias for the ESI-1 case and block this correction from ever running.
-    if _low_acuity_profile(patient, vital, completeness):
-        complaint = str(patient.get("chiefcomplaint") or "").strip().lower()
-        if any(term in complaint for term in ("medication refill", "prescription refill", "routine refill")):
-            low_esi = 5
-        else:
-            low_esi = 4
-        return low_esi, False, ["complete low-acuity profile with normal vitals"], "LOW_ACUITY_PROFILE"
+        # Missing-data safety review. Do not force an ESI-1 merely because a
+        # probability is high when there is no objective emergency evidence.
+        if completeness < 0.65:
+            clinician_review_required = True
+            safety_reasons.append("materially incomplete patient data")
+            safety_decision = "SAFETY_ESCALATION"
 
-    if raw_pred == 1:
-        return 2, False, safety_reasons, "SAFETY_ESCALATION"
+        if high_risk_reasons and acuity > 2:
+            acuity = 2
+            safety_reasons.append("high-risk presentation guard")
+            safety_decision = "SAFETY_ESCALATION"
 
-    return raw_pred, False, [], "ML_DECISION"
+        # For raw ESI-1 without objective life-threat evidence, do not expose it
+        # as an ESI-1 decision; route to ESI-2 with a safety reason instead.
+        if raw_esi == 1 and acuity == 1 and not emergency_reasons:
+            acuity = 2
+            safety_reasons.append("non-emergency ESI-1 guard")
+            safety_decision = "SAFETY_ESCALATION"
 
-def predict_patient(patient, audit=True):
-    model = load_model()
-    X = prepare_patient(patient)
-    missing = _missing_fields(X)
-    completeness = float(1.0 - len(missing) / len(FEATURES))
-    reliability = _data_reliability(completeness)
-
-    vital = _run_vital_interpreter(patient)
-    history = evaluate_history(patient)
-
-    # Always run CatBoost first so ML prediction/probabilities remain visible
-    # even when the safety engine ultimately forces ESI-1.
-    raw_pred = int(np.asarray(model.predict(X)).reshape(-1)[0])
-    probs = np.asarray(model.predict_proba(X))[0]
-    classes = np.asarray(model.classes_).astype(int)
-    confidence = float(np.max(probs))
-
-    final_esi, emergency, decision_reasons, safety_decision = _safety_adjustment(
-        patient, vital, raw_pred, completeness, history
-    )
-
-    # Facility context is computed on the final ESI, after the safety
-    # engine, and never feeds back into acuity -- it only decides whether
-    # a transfer should be recommended.
-
-    clinician_review_required = reliability == "LOW"
-
-    result = {
-        "acuity": int(final_esi),
-        "confidence": None if emergency else confidence,
-        "confidence_display": not emergency,
-        "probabilities": {str(int(c)): float(p) for c, p in zip(classes, probs)},
+    return {
+        "acuity": int(acuity),
+        "confidence": confidence,
+        "confidence_display": confidence is not None,
+        "probabilities": raw_probs,
         "missing_fields": missing,
-        "data_completeness": completeness,
-        "decision_reliability": reliability,
-        "clinician_review_required": clinician_review_required,
-        "emergency_override": emergency,
-        "emergency_reasons": decision_reasons if emergency else [],
-        "safety_reasons": [] if emergency else decision_reasons,
+        "data_completeness": float(completeness),
+        "decision_reliability": decision_reliability,
+        "clinician_review_required": bool(clinician_review_required),
+        "emergency_override": bool(emergency_override),
+        "emergency_reasons": emergency_reasons,
+        "safety_reasons": safety_reasons,
         "safety_decision": safety_decision,
-        "ml_raw_acuity": raw_pred,
-        "non_emergency_esi1_guard": bool(raw_pred == 1 and not emergency),
-        "vital_interpreter": vital,
-        "history_context": {
-            "has_prior_record": history.has_prior_record,
-            "conditions_present": history.conditions_present,
-            "relevant_risk": history.has_relevant_risk,
-        },
+        "ml_raw_acuity": raw_esi,
+        "non_emergency_esi1_guard": (raw_esi == 1 and not emergency_reasons),
     }
 
 
-    return result
-
-
-if __name__ == "__main__":
-    print("=" * 70)
-    print("PATIENTTRIAGE.AI - INTEGRATED SMOKE TEST")
-    print("=" * 70)
-    result = predict_patient({"age": 35, **{f: None for f in FEATURES}})
-    print("SUCCESS")
-    print("Final ESI:", result["acuity"])
-    print("ML raw ESI:", result["ml_raw_acuity"])
-    print("Probabilities:", result["probabilities"])
-    print("Reliability:", result["decision_reliability"])
-    print("Clinician review required:", result["clinician_review_required"])
-    print("Vital interpreter:", result["vital_interpreter"]["error"] or "OK")
+__all__ = ["predict_patient", "FEATURES"]

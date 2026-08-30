@@ -367,18 +367,27 @@ onDecisionComplete();
       : t("No Review Required")
   }
 />
+<Info
+  label={t("Confidence")}
+  value={
+    assessment.confidence_band === "emergency_override"
+      ? t("N/A")
+      : `${Math.round(
+          assessment.confidence * 100,
+        )}%`
+  }
+/>
 
-                  <Info
-                    label={t("Confidence")}
-                    value={`${Math.round(
-                      assessment.confidence * 100,
-                    )}%`}
-                  />
-
-                  <Info
-                    label={t("Confidence Band")}
-                    value={t(assessment.confidence_band)}
-                  />
+<Info
+  label={t("Confidence Band")}
+  value={
+    assessment.confidence_band === "emergency_override"
+      ? t("Emergency Override")
+      : assessment.confidence_band
+        ? t(assessment.confidence_band)
+        : t("N/A")
+  }
+/>
 
                 </div>
               </section>
@@ -569,13 +578,14 @@ onDecisionComplete();
                         ESI-{vitalResult.assessment.esi_level}
                       </p>
 
-                      <p className="mt-1 text-sm text-slate-600">
-                        {t("Confidence")}{" "}
-                        {Math.round(
-                          vitalResult.assessment.confidence * 100,
-                        )}
-                        %
-                      </p>
+<p className="mt-1 text-sm text-slate-600">
+  {t("Confidence")}{" "}
+  {vitalResult.assessment.confidence_band === "emergency_override"
+    ? t("N/A")
+    : `${Math.round(
+        vitalResult.assessment.confidence * 100,
+      )}%`}
+</p>
 
                     </div>
 
@@ -656,12 +666,13 @@ onDecisionComplete();
             {t("Confidence")}
           </p>
 
-          <p className="text-lg font-bold text-slate-900">
-            {Math.round(
-              assessment.confidence * 100,
-            )}
-            %
-          </p>
+<p className="text-lg font-bold text-slate-900">
+  {assessment.confidence_band === "emergency_override"
+    ? t("N/A")
+    : `${Math.round(
+        assessment.confidence * 100,
+      )}%`}
+</p>
         </div>
 
       </div>

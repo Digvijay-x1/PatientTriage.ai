@@ -4,7 +4,8 @@ export type EsiLevel = 1 | 2 | 3 | 4 | 5;
 export type ConfidenceBand =
   | "high"
   | "medium"
-  | "low";
+  | "low"
+  | "emergency_override";
 
 
 // -------------------------------

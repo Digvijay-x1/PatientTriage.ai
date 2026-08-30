@@ -766,16 +766,47 @@ const [pain, setPain] = useState("");
               {t("AI Recommendation")}: ESI-{aiResult.esi_level}
             </span>
 
-            {aiResult.confidence !== null && (
-  <span className="text-xs text-slate-500">
-    {Math.round(aiResult.confidence * 100)}%{" "}
-    {t("confidence")}{" "}
-    {aiResult.confidence_band
-      ? `(${t(aiResult.confidence_band)})`
-      : ""}
-  </span>
-)}
+            <div>
+  <p className="text-xs font-medium text-slate-400">
+    {t("Confidence")}
+  </p>
 
+  <p className="mt-1 text-sm font-semibold text-slate-900">
+    {aiResult.confidence_band === "emergency_override"
+      ? t("N/A")
+      : aiResult.confidence !== null
+        ? `${Math.round(aiResult.confidence * 100)}%`
+        : t("N/A")}
+  </p>
+</div>
+
+<div>
+  <p className="text-xs font-medium text-slate-400">
+    {t("Confidence Band")}
+  </p>
+
+  <p className="mt-1 text-sm font-semibold text-slate-900">
+    {aiResult.confidence_band === "emergency_override"
+      ? t("Emergency Override")
+      : aiResult.confidence_band
+        ? t(aiResult.confidence_band)
+        : t("N/A")}
+  </p>
+</div>
+
+<div>
+  <p className="text-xs font-medium text-slate-400">
+    {t("Confidence Band")}
+  </p>
+
+  <p className="mt-1 text-sm font-semibold text-slate-900">
+    {aiResult.confidence_band === "emergency_override"
+      ? t("Emergency Override")
+      : aiResult.confidence_band
+        ? t(aiResult.confidence_band)
+        : t("N/A")}
+  </p>
+</div>
           </div>
 
           {aiResult.reasoning.length > 0 && (

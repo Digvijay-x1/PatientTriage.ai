@@ -163,44 +163,35 @@ def check_retriage_alerts():
                 "event_type": "time-based-retriage",
                 "data": {
                     "wait_time_minutes": (
-                        datetime.utcnow()
-                        - patient.arrival_time
+                        datetime.utcnow() - patient.arrival_time
                     ).total_seconds() / 60,
-
                     "previous_esi_level": alert.esi_level,
                 },
             },
         )
 
-        alert.esi_level =  assessment_result["esi_level"]
+        # Normalize confidence
+        ai_confidence = assessment_result.get("confidence")
 
-        # --------------------------------------------------
-        # 3. Save NEW TriageAssessment
-        # --------------------------------------------------
+        if ai_confidence is None:
+            ai_confidence = 0.0
 
+        # Update alert ESI
+        alert.esi_level = assessment_result["esi_level"]
+
+        # Create NEW assessment
         assessment = TriageAssessment(
             patient_id=patient.id,
-
             ai_esi_level=assessment_result["esi_level"],
-
-            ai_confidence=assessment_result["confidence"],
-
-            confidence_band=assessment_result[
-                "confidence_band"
-            ],
-
+            ai_confidence=ai_confidence,
+            confidence_band=assessment_result["confidence_band"],
             ai_reasoning=json.dumps(
-                assessment_result.get(
-                    "reasoning",
-                    []
-                )
+                assessment_result.get("reasoning", [])
             ),
-
             auto_escalate_for_review=assessment_result.get(
                 "auto_escalate_for_coordinator_review",
                 False,
             ),
-
             vital_details=json.dumps({}),
         )
 
@@ -220,7 +211,7 @@ def check_retriage_alerts():
 
             ai_esi=assessment_result["esi_level"],
 
-            ai_confidence=assessment_result["confidence"],
+            ai_confidence=ai_confidence,
 
             ai_reasoning=json.dumps(
                 assessment_result.get(

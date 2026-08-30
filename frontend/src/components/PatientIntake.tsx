@@ -675,18 +675,23 @@ function TriageResult({
   value={`ESI-${result.esiLevel}`} 
 />
 
-<ResultCard 
-  label={t("Confidence")} 
-  value={`${Math.round(
-    result.confidence * 100,
-  )}%`} 
+<ResultCard
+  label="Confidence"
+  value={
+    result.confidenceBand === "emergency_override"
+      ? "N/A"
+      : `${Math.round(result.confidence * 100)}%`
+  }
 />
 
-<ResultCard 
-  label={t("Confidence Band")} 
-  value={t(result.confidenceBand)} 
+<ResultCard
+  label="Confidence Band"
+  value={
+    result.confidenceBand === "emergency_override"
+      ? "Emergency Override"
+      : result.confidenceBand
+  }
 />
-
 </div>
 
 <div className="mt-6">

@@ -204,9 +204,9 @@ useEffect(() => {
 
       toast.add({
         title: "Re-triage due",
-        description: `Patient P${String(
+        description: `Patient ${String(
           alert.patient_id,
-        ).padStart(3, "0")} has reached the reassessment threshold.`,
+        )} has reached the reassessment threshold.`,
         type: "warning",
       });
     });
