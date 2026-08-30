@@ -360,9 +360,13 @@ onDecisionComplete();
                   />
 
                   <Info
-                    label={t("Assessment")}
-                    value={`#${assessment.assessment_id}`}
-                  />
+  label={t("Review Status")}
+  value={
+    assessment.auto_escalate_for_review
+      ? t("Requires Review")
+      : t("No Review Required")
+  }
+/>
 
                   <Info
                     label={t("Confidence")}
@@ -690,7 +694,7 @@ onDecisionComplete();
                       onClick={handleConfirm}
                       className="flex-1 rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
                     >
-                      {t("Confirm AI Recommendation: ESI-{assessment.esi_level}")}
+                      Confirm AI Recommendation: ESI-{assessment.esi_level}
                     </button>
 
                     <button

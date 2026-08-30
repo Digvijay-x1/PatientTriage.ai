@@ -424,30 +424,33 @@ def event_triggered_retriage():
 
         return jsonify({
             "success": True,
-            "assessment_id": triage_assessment.id,
-            "audit_log_id": result["audit_log"].id,
 
-            "esi_level": assessment.get(
-                "esi_level"
-            ),
+            "assessment_id":
+                triage_assessment.id,
 
-            "confidence": assessment.get(
-                "confidence"
-            ),
+            "audit_log_id":
+                result["audit_log"].id,
 
-            "confidence_band": assessment.get(
-                "confidence_band"
-            ),
+            "esi_level":
+                assessment.get("esi_level"),
 
-            "reasoning": assessment.get(
-                "reasoning",
-                [],
-            ),
+            "confidence":
+                assessment.get("confidence"),
 
-            "auto_escalate_for_review": assessment.get(
-                "auto_escalate_for_coordinator_review",
-                False,
-            ),
+            "confidence_band":
+                assessment.get("confidence_band"),
+
+            "reasoning":
+                assessment.get(
+                    "reasoning",
+                    [],
+                ),
+
+            "auto_escalate_for_review":
+                assessment.get(
+                    "auto_escalate_for_coordinator_review",
+                    False,
+                ),
         }), 200
 
     except Exception as e:

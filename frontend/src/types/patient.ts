@@ -13,11 +13,15 @@ export type ConfidenceBand =
 
 export interface Patient {
   id: number;
+
   patient_id?: string;
 
   age?: number;
+
   complaint?: string;
-  sex? : string;
+
+  sex?: string;
+
   // Vital signs
   heart_rate?: number;
   respiratory_rate?: number;
@@ -25,10 +29,18 @@ export interface Patient {
   diastolic_bp?: number;
   spo2?: number;
   temperature?: number;
+  pain: number;
+
+  // History
+  has_prior_record?: boolean;
+  history_cardiac?: boolean;
+  history_respiratory?: boolean;
+  history_diabetes?: boolean;
+  history_renal?: boolean;
+  history_hypertension?: boolean;
 
   // Additional information
   symptoms?: string[];
-  medical_history?: string[];
 
   arrival_time?: string;
 }

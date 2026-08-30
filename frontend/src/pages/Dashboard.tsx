@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-
-import StatCard from "../components/StatCard";
 import AttentionPanel from "../components/AttentionPanel";
 import PatientQueue from "../components/PatientQueue";
 import PatientReview from "../components/PatientReview";
 import PatientIntake from "../components/PatientIntake";
 import { Button } from "../components/ui/button";
-import { getRetriageAlerts , getInCarePatients, type InCarePatient, getAuditTrail, type AuditEvent, completePatient} from "../services/api";
+import { getRetriageAlerts , getInCarePatients, type InCarePatient, getAuditTrail, type AuditEvent, completePatient, type WaitingQueuePatient} from "../services/api";
 import { toast } from "../components/ui/toast";
 import { useLanguage } from "../context/LanguageContext";
-
 import {
   Tabs,
   TabsList,
@@ -18,6 +15,7 @@ import {
 } from "../components/ui/tabs";
 
 import type { RetriageAlert } from "../types/patient";
+import HospitalCapacity from "../components/HospitalCapacity";
 
 function Dashboard() {
   const [alerts, setAlerts] = useState<RetriageAlert[]>([]);
@@ -29,7 +27,9 @@ function Dashboard() {
   const [queueRefreshKey, setQueueRefreshKey] = useState(0);
   const [alertRefreshKey, setAlertRefreshKey] = useState(0);
   const [showPatientIntake, setShowPatientIntake] = useState(false);
-
+  const [queuePatients, setQueuePatients] = useState<
+  WaitingQueuePatient[]
+>([]);
   const [inCarePatients, setInCarePatients] = useState<InCarePatient[]>([]);
 const [loadingInCare, setLoadingInCare] = useState(true);
 
@@ -230,13 +230,13 @@ useEffect(() => {
 
     <header className="border-b border-slate-200 bg-white">
 
-      <div className="mx-auto w-full max-w-7xl px-6">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
 
         {/* =================================================
             TOP ROW
             ================================================= */}
 
-        <div className="flex w-full items-center justify-between py-4">
+        <div className="flex w-full flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
 
           {/* Brand - LEFT */}
           <div>
@@ -256,7 +256,7 @@ useEffect(() => {
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-4">
+          <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end">
 
             {/* Language */}
             <select
@@ -287,12 +287,12 @@ useEffect(() => {
             NAVIGATION TABS
             ================================================= */}
 
-        <div className="border-t border-slate-100">
+        <div className="overflow-x-auto border-t border-slate-100">
 
           <TabsList
-            variant="line"
-            className="h-12 w-full justify-start gap-6 rounded-none p-0"
-          >
+  variant="line"
+  className="h-12 w-full justify-start gap-5 overflow-x-auto rounded-none p-0"
+>
 
             <TabsTrigger
               value="overview"
@@ -342,8 +342,8 @@ useEffect(() => {
         MAIN CONTENT
         ==================================================== */}
 
-    <main className="w-full py-6">
-      <div className="mx-auto max-w-7xl px-6">
+    <main className="w-full py-4 sm:py-6">
+  <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
 
         <TabsContent
           value="overview"
@@ -353,19 +353,24 @@ useEffect(() => {
           {/* Page heading */}
           <div className="mb-5">
 
-            <h2 className="text-xl font-bold tracking-tight">
+            <h2 className="text-2xl font-bold tracking-tight">
               {t("Emergency Department Overview")}
             </h2>
-
-            <p className="mt-1 text-slate-500">
-              {t("Focus your attention where it matters most.")}
-            </p>
 
           </div>
 
 
-          {/* Add Patient */}
-          <div className="mb-6 flex">
+          
+
+           <HospitalCapacity patients={queuePatients}/>
+
+
+            {/* =================================================
+                NEEDS ATTENTION + WAITING QUEUE
+                ORIGINAL SIDE-BY-SIDE LAYOUT
+                ================================================= */}
+            {/* Add Patient */}
+          <div className="mb-4 flex my-6">
 
             <Button
               onClick={() =>
@@ -376,38 +381,6 @@ useEffect(() => {
             </Button>
 
           </div>
-
-
-          {/* =================================================
-              STATS
-              ================================================= */}
-
-          <div className="grid grid-cols-1 gap-4 py-2 sm:grid-cols-2 lg:grid-cols-4">
-
-            <StatCard
-              label={t("Re-triage")}
-              value={
-                loadingAlerts
-                  ? "..."
-                  : String(alerts.length)
-              }
-              description={t("Reassessment required")}
-            />
-
-            <StatCard
-              label={t("ED Capacity")}
-              value="87%"
-              description={t("Current utilization")}
-            />
-
-          </div>
-
-
-            {/* =================================================
-                NEEDS ATTENTION + WAITING QUEUE
-                ORIGINAL SIDE-BY-SIDE LAYOUT
-                ================================================= */}
-
             <div className="mt-4 grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
 
               <AttentionPanel
@@ -424,6 +397,7 @@ useEffect(() => {
                     (current) => current + 1,
                   )
                 }
+                onPatientsLoaded={setQueuePatients}
               />
 
             </div>
@@ -466,6 +440,7 @@ useEffect(() => {
                   (current) => current + 1,
                 )
               }
+              onPatientsLoaded={setQueuePatients}
             />
 
           </TabsContent>
@@ -482,11 +457,11 @@ useEffect(() => {
 
     <div className="mb-4">
       <h2 className="text-xl font-bold tracking-tight">
-        In Care
+        {t("In Care")}
       </h2>
 
       <p className="mt-1 text-slate-500">
-        Patients currently receiving treatment.
+        {t("Patients currently receiving treatment.")}
       </p>
     </div>
 
@@ -494,7 +469,7 @@ useEffect(() => {
 
       <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <p className="text-sm text-slate-500">
-          Loading patients in care...
+          {t("Loading patients in care...")}
         </p>
       </div>
 
@@ -508,11 +483,11 @@ useEffect(() => {
           </div>
 
           <p className="mt-4 text-sm font-semibold text-slate-800">
-            No patients currently in care
+            {t("No patients currently in care")}
           </p>
 
           <p className="mt-1 text-sm text-slate-500">
-            Patients will appear here when they are moved into care.
+            {t("Patients will appear here when they are moved into care.")}
           </p>
         </div>
 
@@ -864,6 +839,8 @@ useEffect(() => {
     </div>
   );
 }
+
+
 
 function formatAuditEvent(eventType: string): string {
   switch (eventType) {

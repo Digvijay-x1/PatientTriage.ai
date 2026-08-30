@@ -97,15 +97,21 @@ export async function submitCoordinatorDecision(
 
 export interface RegisterPatientRequest {
   patient_id: string;
+
   age: number;
+
   chief_complaint: string;
+
   sex: string;
+
   vitals?: {
     spo2?: number;
     bp_systolic?: number;
     bp_diastolic?: number;
     heart_rate?: number;
     temperature?: number;
+    pain?: number;
+    respiratory_rate?: number;
   };
 
   observed?: {
@@ -113,6 +119,14 @@ export interface RegisterPatientRequest {
     breathing?: string;
     distress_level?: string;
   };
+
+  // Medical history
+  has_prior_record?: boolean;
+  history_cardiac?: boolean;
+  history_respiratory?: boolean;
+  history_diabetes?: boolean;
+  history_renal?: boolean;
+  history_hypertension?: boolean;
 }
 
 export interface RegisterPatientResponse {
@@ -171,6 +185,7 @@ export interface VitalCheckRequest {
     heart_rate?: number;
     temperature?: number;
     respiratory_rate?: number;
+    pain?: number;
   };
 }
 

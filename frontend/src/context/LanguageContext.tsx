@@ -47,22 +47,92 @@ const translations: Record<string, string> = {
   "Loading...": "लोड हो रहा है...",
   "No": "नहीं",
 
+   "History": "इतिहास",
+"Cardiac": "हृदय रोग",
+"Respiratory": "श्वसन रोग",
+"Diabetes": "मधुमेह",
+"Renal": "गुर्दे की बीमारी",
+"Hypertension": "उच्च रक्तचाप",
+
+"Hospital Capacity": "अस्पताल क्षमता",
+"Current availability of hospital resources": "अस्पताल के संसाधनों की वर्तमान उपलब्धता",
+
+"Triage Distribution": "ट्रायेज़ वितरण",
+"Current patients by ESI level": "ESI स्तर के अनुसार वर्तमान मरीज",
+
+"Immediate": "तत्काल",
+"Emergent": "अत्यावश्यक",
+"Urgent": "शीघ्र आवश्यक",
+"Less urgent": "कम तात्कालिक",
+"Non-urgent": "गैर-तात्कालिक",
+
+"General Beds": "सामान्य बेड",
+"ICU Beds": "ICU बेड",
+"Ventilators": "वेंटिलेटर",
+"Monitors": "मॉनिटर",
+
+"available": "उपलब्ध",
+"available beds": "उपलब्ध बेड",
+"available units": "उपलब्ध यूनिट",
+"occupied": "भरे हुए",
+"currently occupied": "वर्तमान में भरे हुए",
+
+"patients": "मरीज",
+"patient": "मरीज",
+"ESI-1": "ESI-1",
+"ESI-2": "ESI-2",
+"ESI-3": "ESI-3",
+"ESI-4": "ESI-4",
+"ESI-5": "ESI-5",
+
+"Immediate attention": "तत्काल ध्यान आवश्यक",
+"Emergent care": "अत्यावश्यक देखभाल",
+"Urgent care": "शीघ्र देखभाल",
+"Non-urgent care": "गैर-तात्कालिक देखभाल",
+
+"Updated Vitals": "अपडेट किए गए जीवन संकेत",
+"Enter the patient's latest vital signs.": "मरीज के नवीनतम जीवन संकेत दर्ज करें.",
+
+"SpO₂ (%)": "SpO₂ (%)",
+"Heart Rate": "हृदय गति",
+"Systolic BP": "सिस्टोलिक BP",
+"Diastolic BP": "डायस्टोलिक BP",
+"Temperature (°C)": "तापमान (°C)",
+
+"normal": "सामान्य",
+"laboured": "कठिन",
+"absent": "अनुपस्थित",
+
+"alert": "सतर्क",
+"confused": "भ्रमित",
+"unresponsive": "अनुत्तरदायी",
+
+"low": "कम",
+"moderate": "मध्यम",
+"high": "उच्च",
+
+"Clinical review": "चिकित्सकीय समीक्षा",
+"Reassessment due": "पुनर्मूल्यांकन आवश्यक",
+
+"Patient condition requires reassessment.": "मरीज की स्थिति के पुनर्मूल्यांकन की आवश्यकता है।",
+"Initial triage assessment requires review.": "प्रारंभिक ट्रायेज़ मूल्यांकन की समीक्षा आवश्यक है।",
+"Patient requires clinical review.": "मरीज की चिकित्सकीय समीक्षा आवश्यक है।",
+
+"Patients surfaced by the triage system for coordinator review":
+  "ट्रायेज़ सिस्टम द्वारा समन्वयक की समीक्षा के लिए चिन्हित मरीज",
+
+"No patients need attention":
+  "किसी मरीज पर ध्यान देने की आवश्यकता नहीं है",
+
+"No active re-triage alerts at the moment.":
+  "इस समय कोई सक्रिय री-ट्रायेज़ अलर्ट नहीं है।",
+
+"Patient has reached the scheduled reassessment time.":
+  "मरीज निर्धारित पुनर्मूल्यांकन समय पर पहुँच गया है।",
+
+"min waiting": "मिनट से प्रतीक्षा में",
   // Attention
-  "Patients surfaced by the triage system for coordinator review":
-    "ट्रायेज सिस्टम द्वारा समन्वयक समीक्षा के लिए चिन्हित मरीज़",
-  "No patients need attention": "किसी मरीज़ पर तत्काल ध्यान आवश्यक नहीं है",
-  "No active re-triage alerts at the moment.":
-    "इस समय कोई सक्रिय पुनः ट्रायेज अलर्ट नहीं है",
-  "Reassessment due": "पुनर्मूल्यांकन आवश्यक",
-  "Clinical review": "नैदानिक समीक्षा",
-  "Patient has reached the scheduled reassessment time.":
-    "मरीज़ निर्धारित पुनर्मूल्यांकन समय तक पहुँच गया है।",
-  "Patient condition requires reassessment.":
-    "मरीज़ की स्थिति के पुनर्मूल्यांकन की आवश्यकता है।",
-  "Initial triage assessment requires review.":
-    "प्रारंभिक ट्रायेज मूल्यांकन की समीक्षा आवश्यक है।",
-  "Patient requires clinical review.": "मरीज़ की नैदानिक समीक्षा आवश्यक है।",
-  "min waiting": "मिनट से प्रतीक्षा",
+ 
   // Patient intake
   "Capture the information available during the patient's initial arrival.":
     "मरीज़ के प्रारंभिक आगमन के समय उपलब्ध जानकारी दर्ज करें।",
@@ -74,10 +144,7 @@ const translations: Record<string, string> = {
   "Initial Vitals": "प्रारंभिक जीवन संकेत",
   "Values available during initial assessment.":
     "प्रारंभिक मूल्यांकन के दौरान उपलब्ध मान।",
-  "Heart Rate": "हृदय गति",
-  "Systolic BP": "सिस्टोलिक BP",
-  "Diastolic BP": "डायस्टोलिक BP",
-  "Temperature (°C)": "तापमान (°C)",
+
   "Initial Observation": "प्रारंभिक अवलोकन",
   "Responsiveness": "प्रतिक्रियाशीलता",
   "Breathing": "श्वसन",
@@ -106,9 +173,7 @@ const translations: Record<string, string> = {
   "Select ESI level": "ESI स्तर चुनें",
   "Reason (optional)": "कारण (वैकल्पिक)",
   "Why is the ESI level changing?": "ESI स्तर क्यों बदला जा रहा है?",
-  "Updated Vitals": "अपडेटेड वाइटल्स",
-  "Enter the patient's latest vital signs.": "मरीज़ के नवीनतम जीवन संकेत दर्ज करें।",
-  "SPO₂ (%)": "SpO₂ (%)",
+  
   "Condition worsened": "स्थिति बिगड़ी",
   "This runs an urgent re-assessment and flags the patient for immediate review.":
     "यह तत्काल पुनर्मूल्यांकन चलाता है और मरीज़ को तुरंत समीक्षा के लिए चिन्हित करता है।",
@@ -163,22 +228,19 @@ const translations: Record<string, string> = {
   "female": "महिला",
 "male": "पुरुष",
 
-"alert": "सचेत",
-"confused": "भ्रमित",
-"unresponsive": "प्रतिक्रियाहीन",
 
-"normal": "सामान्य",
+
 "labored": "कठिन",
-"absent": "अनुपस्थित",
+
 
 "none": "कोई नहीं",
 "mild": "हल्का",
-"moderate": "मध्यम",
+
 "severe": "गंभीर",
 
-"high": "उच्च",
+
 "medium": "मध्यम",
-"low": "कम",
+
 
 
 "Describe the deterioration in the patient's condition...": "मरीज़ की स्थिति में हुए बदलाव का विवरण दें...",
@@ -217,13 +279,17 @@ const translations: Record<string, string> = {
 "Mark this patient as having entered active care.":
   "इस मरीज़ को सक्रिय उपचार में भेजा गया के रूप में चिह्नित करें।",
 "Updating...": "अपडेट हो रहा है...",
-
-
+"Pain Level (1-10)": "दर्द का स्तर",
+"Medical History": "चिकित्सकीय इतिहास",
+"Respiratory Rate": "श्वसन दर",
+"Review Status": "समीक्षा स्थिति",
+"Requires Review": "समीक्षा आवश्यक",
+"No Review Required": "समीक्षा आवश्यक नहीं",
 "EMERGENCY DEPARTMENT COORDINATION":
   "आपातकालीन विभाग समन्वय",
-
 "ED Live":
   "ED लाइव",
+  "Triage Load": "ट्रायेज़ लोड",
 };
 
 const LanguageContext = createContext<LanguageContextType | null>(null);

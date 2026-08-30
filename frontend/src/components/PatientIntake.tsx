@@ -28,7 +28,13 @@ function PatientIntake({
   const [diastolic, setDiastolic] = useState("");
   const [heartRate, setHeartRate] = useState("");
   const [temperature, setTemperature] = useState("");
-
+  
+const [historyCardiac, setHistoryCardiac] = useState(false);
+const [historyRespiratory, setHistoryRespiratory] = useState(false);
+const [historyDiabetes, setHistoryDiabetes] = useState(false);
+const [historyRenal, setHistoryRenal] = useState(false);
+const [historyHypertension, setHistoryHypertension] = useState(false);
+const hasPriorRecord = historyCardiac || historyRespiratory || historyDiabetes || historyRenal || historyHypertension;
   const [responsiveness, setResponsiveness] =
     useState("alert");
 
@@ -51,7 +57,10 @@ function PatientIntake({
     autoEscalate: boolean;
   } | null>(null);
 
+  const [respRate, setrespRate] = useState("");
   const { t } = useLanguage();
+
+  const [pain, setPain] = useState<string>("");
 
   useEffect(() => {
   if (open) {
@@ -67,27 +76,38 @@ function PatientIntake({
     setSubmitting(true);
     setError(null);
 
-    try {
-      // 1. Register patient
-      const patient = await registerPatient({
-        patient_id: patientId,
-        age: Number(age),
-        chief_complaint: chiefComplaint,
-        sex: sex,
-        vitals: {
-          spo2: Number(spo2),
-          bp_systolic: Number(systolic),
-          bp_diastolic: Number(diastolic),
-          heart_rate: Number(heartRate),
-          temperature: Number(temperature),
-        },
+   try {
+  // 1. Register patient
+  const patient = await registerPatient({
+    patient_id: patientId,
+    age: Number(age),
+    chief_complaint: chiefComplaint,
+    sex: sex,
 
-        observed: {
-          responsiveness,
-          breathing,
-          distress_level: distressLevel,
-        },
-      });
+    vitals: {
+      spo2: Number(spo2),
+      bp_systolic: Number(systolic),
+      bp_diastolic: Number(diastolic),
+      heart_rate: Number(heartRate),
+      temperature: Number(temperature),
+      pain: pain === "" ? undefined : Number(pain),
+      respiratory_rate: Number(respRate),
+    },
+
+    observed: {
+      responsiveness,
+      breathing,
+      distress_level: distressLevel,
+    },
+
+    // Medical history
+    has_prior_record: hasPriorRecord,
+    history_cardiac: historyCardiac,
+    history_respiratory: historyRespiratory,
+    history_diabetes: historyDiabetes,
+    history_renal: historyRenal,
+    history_hypertension: historyHypertension,
+  });
 
       // 2. Run AI triage
       const triage = await runTriage(
@@ -303,12 +323,35 @@ function PatientIntake({
 
                 {/* Observation */}
                 <section>
-                  <h2 className="text-sm font-semibold text-slate-900">
-  {t("Initial Observation")}
-</h2>
+        
 
+ <div>
+  <label className="text-xs font-medium text-slate-600">
+    {t("Pain Level (0–10)")}
+  </label>
+  <input
+    type="number"
+    min={0}
+    max={10}
+    value={pain}
+    onChange={(e) => setPain(e.target.value)}
+    placeholder="0"
+    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+  />
+</div>
+
+<Field 
+  label={t("Respiratory Rate")} 
+  type="number" 
+  value={respRate} 
+  onChange={setrespRate} 
+  placeholder="24" 
+/>
 <div className="mt-4 grid gap-4 sm:grid-cols-3">
+ 
+  
 
+          
   <SelectField 
     label={t("Responsiveness")} 
     value={responsiveness} 
@@ -327,7 +370,7 @@ function PatientIntake({
     options={[
       "normal", 
       "labored", 
-      "absent",
+      "fast",
     ]} 
   />
 
@@ -343,6 +386,87 @@ function PatientIntake({
     ]} 
   />
 
+  
+
+</div>
+<div className="mt-5">
+  <p className="text-sm font-medium text-slate-700">
+    {t("Medical History")}
+  </p>
+
+  <div className="mt-3 grid grid-cols-2 gap-3">
+
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={historyCardiac}
+        onChange={(e) =>
+          setHistoryCardiac(e.target.checked)
+        }
+        className="h-4 w-4 rounded border-slate-300"
+      />
+      <span className="text-sm text-slate-700">
+        {t("Cardiac")}
+      </span>
+    </label>
+
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={historyRespiratory}
+        onChange={(e) =>
+          setHistoryRespiratory(e.target.checked)
+        }
+        className="h-4 w-4 rounded border-slate-300"
+      />
+      <span className="text-sm text-slate-700">
+        {t("Respiratory")}
+      </span>
+    </label>
+
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={historyDiabetes}
+        onChange={(e) =>
+          setHistoryDiabetes(e.target.checked)
+        }
+        className="h-4 w-4 rounded border-slate-300"
+      />
+      <span className="text-sm text-slate-700">
+        {t("Diabetes")}
+      </span>
+    </label>
+
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={historyRenal}
+        onChange={(e) =>
+          setHistoryRenal(e.target.checked)
+        }
+        className="h-4 w-4 rounded border-slate-300"
+      />
+      <span className="text-sm text-slate-700">
+        {t("Renal")}
+      </span>
+    </label>
+
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={historyHypertension}
+        onChange={(e) =>
+          setHistoryHypertension(e.target.checked)
+        }
+        className="h-4 w-4 rounded border-slate-300"
+      />
+      <span className="text-sm text-slate-700">
+        {t("Hypertension")}
+      </span>
+    </label>
+
+  </div>
 </div>
                 </section>
 

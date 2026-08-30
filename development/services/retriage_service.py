@@ -261,9 +261,7 @@ def handle_event_driven_retriage(
     data,
 ):
     """
-    Run a fresh AI assessment after a clinical event.
-
-    Every re-triage creates a NEW TriageAssessment.
+    Run a fresh V2 assessment after a clinical event.
     """
 
     from services.triage_service import run_triage_assessment
@@ -273,7 +271,10 @@ def handle_event_driven_retriage(
     if not patient:
         return None
 
-    # Run fresh AI assessment
+    # =====================================================
+    # RUN FRESH ASSESSMENT
+    # =====================================================
+
     assessment_result = run_triage_assessment(
         patient,
         event_context={
@@ -282,18 +283,24 @@ def handle_event_driven_retriage(
         },
     )
 
-    # --------------------------------------------------
-    # Create a NEW assessment
-    # --------------------------------------------------
+    # =====================================================
+    # CREATE NEW TRIAGE ASSESSMENT
+    # =====================================================
 
     assessment = TriageAssessment(
         patient_id=patient.id,
 
         ai_esi_level=assessment_result["esi_level"],
 
-        ai_confidence=assessment_result["confidence"],
+        ai_confidence=(
+            assessment_result["confidence"]
+            if assessment_result["confidence"] is not None
+            else 0.0
+        ),
 
-        confidence_band=assessment_result["confidence_band"],
+        confidence_band=assessment_result.get(
+            "confidence_band"
+        ),
 
         ai_reasoning=json.dumps(
             assessment_result.get(
@@ -317,12 +324,11 @@ def handle_event_driven_retriage(
 
     db.session.add(assessment)
 
-    # Make sure the new assessment gets its DB id
     db.session.flush()
 
-    # --------------------------------------------------
-    # Complete old active alerts
-    # --------------------------------------------------
+    # =====================================================
+    # CLOSE OLD ALERTS
+    # =====================================================
 
     existing_alerts = (
         RetriageAlert.query
@@ -338,9 +344,9 @@ def handle_event_driven_retriage(
         existing_alert.retriaged = True
         existing_alert.retriage_time = datetime.utcnow()
 
-    # --------------------------------------------------
-    # Create NEW active alert for this assessment
-    # --------------------------------------------------
+    # =====================================================
+    # CREATE NEW ALERT
+    # =====================================================
 
     alert = RetriageAlert(
         patient_id=patient.id,
@@ -362,9 +368,9 @@ def handle_event_driven_retriage(
 
     db.session.add(alert)
 
-    # --------------------------------------------------
-    # Audit log
-    # --------------------------------------------------
+    # =====================================================
+    # AUDIT
+    # =====================================================
 
     audit_log = AuditLog(
         patient_id=patient_id,
@@ -375,7 +381,11 @@ def handle_event_driven_retriage(
 
         ai_esi=assessment_result["esi_level"],
 
-        ai_confidence=assessment_result["confidence"],
+        ai_confidence=(
+            assessment_result["confidence"]
+            if assessment_result["confidence"] is not None
+            else 0.0
+        ),
 
         ai_reasoning=json.dumps(
             assessment_result.get(
@@ -399,8 +409,6 @@ def handle_event_driven_retriage(
         "triage_assessment": assessment,
         "alert": alert,
     }
-
-
 def complete_retriage(
     patient_id,
     new_esi_level,

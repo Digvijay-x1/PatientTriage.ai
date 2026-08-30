@@ -29,9 +29,13 @@ class Patient(db.Model):
     distress_level = db.Column(db.String(100), nullable=True)  # none, mild, moderate, severe
     
     # History
-    prior_history_available = db.Column(db.Boolean, default=False)
-    prior_conditions = db.Column(db.Text, nullable=True)  # JSON string
-    medications = db.Column(db.Text, nullable=True)       # JSON string
+    has_prior_record = db.Column(db.Boolean, nullable=False, default=False)
+
+    history_cardiac = db.Column(db.Boolean, nullable=False, default=False)
+    history_respiratory = db.Column(db.Boolean, nullable=False, default=False)
+    history_diabetes = db.Column(db.Boolean, nullable=False, default=False)
+    history_renal = db.Column(db.Boolean, nullable=False, default=False)
+    history_hypertension = db.Column(db.Boolean, nullable=False, default=False)
     
     # Clarifying questions/answers
     clarifying_qa = db.Column(db.Text, nullable=True)     # JSON string

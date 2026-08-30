@@ -11,15 +11,16 @@ import {
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { useLanguage } from "../context/LanguageContext";
-
 type PatientQueueProps = {
   refreshKey: number;
   onRetriageTriggered: () => void;
+  onPatientsLoaded: (patients: WaitingQueuePatient[]) => void;
 };
 
 function PatientQueue({
   refreshKey,
   onRetriageTriggered,
+  onPatientsLoaded
 }: PatientQueueProps) {
 
   const [patients, setPatients] = useState<
@@ -48,7 +49,7 @@ function PatientQueue({
         }
 
         const data = await getWaitingQueue();
-
+        onPatientsLoaded(data.patients);
         setPatients((prev) => {
 
           const same =
@@ -358,10 +359,10 @@ function PatientEventPanel({
   const [systolic, setSystolic] = useState("");
   const [diastolic, setDiastolic] = useState("");
   const [temperature, setTemperature] = useState("");
-
+const [respRate, setRespRate] = useState("");
+const [pain, setPain] = useState("");
   // Observation
   const [description, setDescription] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [takingToCare, setTakingToCare] = useState(false);
@@ -421,6 +422,8 @@ function PatientEventPanel({
                   bp_systolic: systolic ? Number(systolic) : null,
                   bp_diastolic: diastolic ? Number(diastolic) : null,
                   temperature: temperature ? Number(temperature) : null,
+                  respiratory_rate: respRate ? Number(respRate) : null,
+                  pain: pain ? Number(pain) : null,
                 }
               : {},
         },
@@ -589,93 +592,130 @@ function PatientEventPanel({
     )}
 
     {/* ===== FORM: Vitals ===== */}
-    {phase === "form" && mode === "vitals" && (
-      <div className="mt-5">
+{phase === "form" && mode === "vitals" && (
+  <div className="mt-5">
 
-        <p className="text-sm font-medium text-slate-700">
-          {t("Updated Vitals")}
-        </p>
+    <p className="text-sm font-medium text-slate-700">
+      {t("Updated Vitals")}
+    </p>
 
-        <p className="mt-1 text-xs text-slate-500">
-          {t("Enter the patient's latest vital signs.")}
-        </p>
+    <p className="mt-1 text-xs text-slate-500">
+      {t("Enter the patient's latest vital signs.")}
+    </p>
 
-        <div className="mt-3 grid grid-cols-2 gap-3">
+    <div className="mt-3 grid grid-cols-2 gap-3">
 
-          <div>
-            <label className="text-xs font-medium text-slate-600">
-              {t("SpO₂ (%)")}
-            </label>
+      {/* SpO2 */}
+      <div>
+        <label className="text-xs font-medium text-slate-600">
+          {t("SpO₂ (%)")}
+        </label>
 
-            <input
-              type="number"
-              value={spo2}
-              onChange={(e) => setSpo2(e.target.value)}
-              placeholder="97"
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-600">
-              {t("Heart Rate")}
-            </label>
-
-            <input
-              type="number"
-              value={heartRate}
-              onChange={(e) => setHeartRate(e.target.value)}
-              placeholder="80"
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-600">
-              {t("Systolic BP")}
-            </label>
-
-            <input
-              type="number"
-              value={systolic}
-              onChange={(e) => setSystolic(e.target.value)}
-              placeholder="120"
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-600">
-              {t("Diastolic BP")}
-            </label>
-
-            <input
-              type="number"
-              value={diastolic}
-              onChange={(e) => setDiastolic(e.target.value)}
-              placeholder="80"
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-600">
-              {t("Temperature (°C)")}
-            </label>
-
-            <input
-              type="number"
-              step="0.1"
-              value={temperature}
-              onChange={(e) => setTemperature(e.target.value)}
-              placeholder="36.8"
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-        </div>
+        <input
+          type="number"
+          value={spo2}
+          onChange={(e) => setSpo2(e.target.value)}
+          placeholder="97"
+          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
       </div>
-    )}
+
+      {/* Heart Rate */}
+      <div>
+        <label className="text-xs font-medium text-slate-600">
+          {t("Heart Rate")}
+        </label>
+
+        <input
+          type="number"
+          value={heartRate}
+          onChange={(e) => setHeartRate(e.target.value)}
+          placeholder="80"
+          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+      </div>
+
+      {/* Respiratory Rate */}
+      <div>
+        <label className="text-xs font-medium text-slate-600">
+          {t("Respiratory Rate")}
+        </label>
+
+        <input
+          type="number"
+          value={respRate}
+          onChange={(e) => setRespRate(e.target.value)}
+          placeholder="18"
+          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+      </div>
+
+      {/* Systolic BP */}
+      <div>
+        <label className="text-xs font-medium text-slate-600">
+          {t("Systolic BP")}
+        </label>
+
+        <input
+          type="number"
+          value={systolic}
+          onChange={(e) => setSystolic(e.target.value)}
+          placeholder="120"
+          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+      </div>
+
+      {/* Diastolic BP */}
+      <div>
+        <label className="text-xs font-medium text-slate-600">
+          {t("Diastolic BP")}
+        </label>
+
+        <input
+          type="number"
+          value={diastolic}
+          onChange={(e) => setDiastolic(e.target.value)}
+          placeholder="80"
+          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+      </div>
+
+      {/* Temperature */}
+      <div>
+        <label className="text-xs font-medium text-slate-600">
+          {t("Temperature (°C)")}
+        </label>
+
+        <input
+          type="number"
+          step="0.1"
+          value={temperature}
+          onChange={(e) => setTemperature(e.target.value)}
+          placeholder="36.8"
+          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+      </div>
+
+      {/* Pain */}
+      <div>
+        <label className="text-xs font-medium text-slate-600">
+          {t("Pain Level")}
+        </label>
+
+        <input
+          type="number"
+          min="0"
+          max="10"
+          value={pain}
+          onChange={(e) => setPain(e.target.value)}
+          placeholder="0"
+          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+      </div>
+
+    </div>
+  </div>
+)}
 
     {/* ===== FORM: Condition Worsened ===== */}
     {phase === "form" && mode === "observation" && (
@@ -727,12 +767,14 @@ function PatientEventPanel({
             </span>
 
             {aiResult.confidence !== null && (
-              <span className="text-xs text-slate-500">
-                {Math.round(aiResult.confidence * 100)}%{" "}
-                {t("confidence")} 
-                aiResult.confidence_band
-              </span>
-            )}
+  <span className="text-xs text-slate-500">
+    {Math.round(aiResult.confidence * 100)}%{" "}
+    {t("confidence")}{" "}
+    {aiResult.confidence_band
+      ? `(${t(aiResult.confidence_band)})`
+      : ""}
+  </span>
+)}
 
           </div>
 

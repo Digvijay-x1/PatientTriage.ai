@@ -45,13 +45,41 @@ def register_patient():
             bp_systolic=data.get('vitals', {}).get('bp_systolic'),
             bp_diastolic=data.get('vitals', {}).get('bp_diastolic'),
             heart_rate=data.get('vitals', {}).get('heart_rate'),
+            respiratory_rate=data.get('vitals', {}).get('respiratory_rate'),
             temperature=data.get('vitals', {}).get('temperature'),
+            pain=data.get('vitals', {}).get('pain'),
             responsiveness=data.get('observed', {}).get('responsiveness'),
             breathing=data.get('observed', {}).get('breathing'),
             distress_level=data.get('observed', {}).get('distress_level'),
-            prior_history_available=data.get('prior_history_available', False),
-            prior_conditions=str(data.get('prior_conditions', [])),
-            medications=str(data.get('medications', [])),
+            has_prior_record=data.get(
+                'has_prior_record',
+                False
+            ),
+
+            history_cardiac=data.get(
+                'history_cardiac',
+                False
+            ),
+
+            history_respiratory=data.get(
+                'history_respiratory',
+                False
+            ),
+
+            history_diabetes=data.get(
+                'history_diabetes',
+                False
+            ),
+
+            history_renal=data.get(
+                'history_renal',
+                False
+            ),
+
+            history_hypertension=data.get(
+                'history_hypertension',
+                False
+            ),
             clarifying_qa=str(data.get('clarifying_qa', {})),
             status='waiting',
             arrival_time=datetime.utcnow(),
