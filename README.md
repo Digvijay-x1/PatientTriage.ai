@@ -1,38 +1,25 @@
 # PatientTriage.ai
-
 ## AI-Assisted Emergency Department Triage Support System
 
-PatientTriage.ai is a prototype emergency department coordination and
-triage support system designed to help healthcare coordinators prioritize
-patients, identify potentially deteriorating patients, and maintain a
-clear audit trail of triage decisions.
+### 1. What is PatientTriage.ai?
 
-The system combines a machine-learning ESI prediction model with a
-vital-sign safety engine and a coordinator-facing dashboard.
+PatientTriage.ai is a prototype emergency-department coordination and triage-support platform designed to help healthcare coordinators prioritize patients, identify potentially deteriorating patients, and maintain a clear, auditable record of triage decisions.
 
-> IMPORTANT: PatientTriage.ai is a prototype decision-support system.
-> It does not replace clinical judgment, diagnosis, or treatment decisions.
+It combines:
 
----
+- A frozen CatBoost-based ESI prediction model
+- Age-aware vital-sign interpretation
+- Critical and urgent safety flags
+- A dedicated safety engine
+- Prior-patient-history context
+- Facility-aware transfer recommendations
+- Automatic re-triage when patient conditions change
+- Coordinator review and override
+- Waiting Queue and Needs Attention workflows
+- In-Care patient tracking
+- An append-only audit trail
 
-## Tech Stack
-
-### Backend
-- Python
-- Flask
-- SQLAlchemy
-- SQLite
-- Scikit-learn
-- Pandas
-- Joblib
-
-### Frontend
-- React
-- TypeScript
-- Tailwind CSS
-
-### AI
-- Google Gemini
+The system is designed as **decision support**, not autonomous clinical decision-making. It does not replace diagnosis, treatment, or qualified clinician judgment.
 
 ---
 
@@ -44,9 +31,14 @@ PatientTriage/
 │   ├── models/
 │   ├── routes/
 │   ├── services/
+│   │   ├── vital_interpreter.py
+│   ├── instances/
+│   │   ├── db
 │   ├── ml/
-│   │   ├── esi_integrated_model.joblib
-│   │   └── vitals_thresholds.json
+│   │   ├── catboost_esi_model_v2.joblib
+│   │   ├── vitals_thresholds.json
+│   │   ├── history_context.py
+│   │   └── audit_log.py
 │   └── app.py
 │
 ├── frontend/
@@ -58,240 +50,568 @@ PatientTriage/
 
 ---
 
-## Setup
 
-### Backend
+# 2. The Core AI Architecture
 
-```bash
-cd backend
-python -m venv venv
-```
-
-Windows:
-
-```bash
-venv\Scripts\activate
-```
-
-Linux/macOS:
-
-```bash
-source venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Set the Gemini API key according to the configuration used by `GeminiExplanationService`.
-
-Start Flask:
-
-```bash
-python app.py
-```
-
-Backend:
-
-`http://127.0.0.1:5000`
-
-### Frontend
-
-Open a second terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open the URL shown by Vite, usually:
-
-`http://localhost:5173`
-
----
-
-## Running the Demo
-
-1. Register a patient.
-2. Run initial triage.
-3. Review the ML ESI recommendation.
-4. Confirm or override the recommendation.
-5. Monitor the patient in the Waiting Queue.
-6. Update vitals to trigger re-triage.
-7. Review the new AI recommendation and safety flags.
-8. Move the patient to In Care when required.
-9. Mark the patient as completed.
-10. Review decisions in the Audit Trail.
-
----
-
-# Problem Statement
-
-Emergency departments can become congested when many patients arrive simultaneously. Initial triage requires healthcare staff to quickly evaluate patients and assign an Emergency Severity Index (ESI) level.
-
-The challenge is that:
-
-- Patient information can be incomplete during initial assessment.
-- Vital signs may change while a patient is waiting.
-- Patients may deteriorate after their initial triage.
-- AI recommendations need human oversight.
-- Changes in triage decisions need to be traceable.
-
-PatientTriage.ai addresses these challenges by providing:
-
-1. ML-assisted ESI prediction.
-2. Vital-sign safety screening.
-3. Re-triage when patient conditions change.
-4. Coordinator review and override.
-5. Waiting queue management.
-6. In-care patient tracking.
-7. Audit trail of important clinical decisions.
-
----
-
-# System Overview
-
-The system follows this workflow:
-
-Patient Intake
-      |
-      v
-Patient Data + Vital Signs
-      |
-      v
-Random Forest ESI Model
-      |
-      +----------------------+
-      |                      |
-      v                      v
-ESI Prediction         Vital Safety Engine
-      |                      |
-      |              Critical / Urgent Flags
-      |                      |
-      +----------+-----------+
-                 |
-                 v
-        Coordinator Dashboard
-                 |
-        +--------+--------+
-        |                 |
-        v                 v
-   Waiting Queue      Needs Attention
-                          |
-                          v
-                     Re-triage
-                          |
-              +-----------+-----------+
-              |                       |
-              v                       v
-       Updated Vitals          Condition Worsened
-              |                       |
-              v                       v
-        ML Prediction            Urgent Flag
-              |                       |
-              +-----------+-----------+
-                          |
-                          v
-                  Coordinator Review
-                          |
-                 Confirm / Override
-                          |
-                          v
-                    Audit Trail
-
-
-## Features
-
-- Patient intake and registration
-- ESI prediction using a Random Forest ML model
-- Age-aware vital-sign safety screening
-- Pediatric blood-pressure screening
-- ML confidence and probability scores
-- Gemini-powered natural-language explanation of ML predictions
-- Event-driven re-triage when vitals change
-- Urgent escalation when a patient's condition worsens
-- Coordinator confirmation and ESI override
-- Waiting Queue and Needs Attention panels
-- In Care and patient completion workflow
-- Clinical decision audit trail
-
----
-
-## ML Model
-
-The system uses a pre-trained Random Forest model:
-
-`ml/esi_integrated_model.joblib`
-
-### Input Features
-
-- Age
-- Sex/Gender
-- Chief Complaint
-- Temperature
-- Heart Rate
-- Respiratory Rate
-- SpO₂
-- Systolic Blood Pressure
-- Diastolic Blood Pressure
-- Pain
-
-The model outputs:
-
-- ESI level (1–5)
-- Prediction confidence
-- Probability distribution across ESI levels
-
----
-
-## Safety Engine
-
-A separate vital-sign safety layer uses:
-
-`ml/vitals_thresholds.json`
-
-It provides:
-
-- Age-aware vital interpretation
-- Critical vital flags
-- Urgent vital flags
-- Pediatric AAP blood-pressure screening
-- Automatic coordinator-review flags
-
-The safety engine acts as an additional layer and does not replace the ML prediction.
-
----
-
-## System Flow
+PatientTriage.ai deliberately separates machine learning from safety and clinical context.
 
 ```text
-Patient Intake
-      ↓
-ML ESI Prediction
-      ↓
-Vital Safety Engine
-      ↓
-Coordinator Dashboard
-      ↓
-Waiting Queue / Needs Attention
-      ↓
-Re-triage if condition changes
-      ↓
-Coordinator Review
-      ↓
-Confirm / Override / Take to Care
-      ↓
-Audit Trail
+                    PATIENT INTAKE
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │    CATBOOST MODEL    │
+              │                     │
+              │  Frozen / tested    │
+              │  ESI prediction     │
+              │  ESI probabilities  │
+              └──────────┬──────────┘
+                         │
+                         ▼
+                  ML ESI + PROBS
+                         │
+          ┌──────────────┼──────────────┐
+          │              │              │
+          ▼              ▼              ▼
+     Vital Safety    Patient History   Facility
+     Interpreter       Context          Context
+          │              │              │
+          ▼              ▼              ▼
+    Critical/urgent   Relevant risk   Transfer/
+       flags           signals        destination
+          │              │              │
+          └──────────────┼──────────────┘
+                         ▼
+                 ┌───────────────┐
+                 │ SAFETY ENGINE  │
+                 │               │
+                 │ Emergency?    │
+                 │ Dangerous     │
+                 │ combinations? │
+                 │ Low acuity?   │
+                 │ Missing data? │
+                 └───────┬───────┘
+                         ▼
+                    FINAL ESI
+                         │
+                         ▼
+                COORDINATOR DASHBOARD
+                         │
+              ┌──────────┴──────────┐
+              ▼                     ▼
+        WAITING QUEUE          NEEDS ATTENTION
+                                      │
+                                      ▼
+                                   RE-TRIAGE
+                                      │
+                                      ▼
+                             COORDINATOR REVIEW
+                                      │
+                              Confirm / Override
+                                      │
+                                      ▼
+                                AUDIT TRAIL
 ```
 
-Gemini is used only to explain the existing ML prediction in natural language. It does not determine or modify the ESI level.
+The key design principle is that **the ML model, Vital Interpreter, history context, facility context, and Safety Engine remain separate and explainable**.
 
 ---
 
+# 3. Machine-Learning Model
 
-## Disclaimer
+The core prediction model is a **frozen, regression-tested CatBoost model**.
 
-PatientTriage.ai is an academic prototype for demonstrating an AI-assisted emergency department triage workflow. It is not a validated medical device and must not be used as a substitute for qualified clinical judgment.
+```text
+catboost_esi_model_v2.joblib
+```
+
+It predicts the Emergency Severity Index across all five levels:
+
+```text
+ESI-1
+ESI-2
+ESI-3
+ESI-4
+ESI-5
+```
+
+The model produces:
+
+- Raw ESI prediction
+- Confidence
+- Probability distribution across all ESI levels
+
+The model itself is intentionally kept frozen so that deployment-context features do not silently alter its learned behavior.
+
+---
+
+# 4. Model Inputs
+
+The verified CatBoost integration schema contains these 12 inputs:
+
+```text
+temperature
+heartrate
+resprate
+o2sat
+sbp
+dbp
+pain
+gender
+breathing
+responsiveness
+distress_level
+chiefcomplaint
+```
+
+The broader system also collects **age** because age is essential to the age-aware Vital Interpreter and pediatric/geriatric safety interpretation.
+
+Patient history and facility information are handled by separate context layers rather than being injected into the frozen CatBoost model.
+
+---
+
+# 5. Age-Aware Vital Interpreter
+
+PatientTriage.ai does not interpret every patient's vital signs using one generic adult threshold.
+
+The Vital Interpreter distinguishes:
+
+- Pediatric patients
+- Adult patients
+- Geriatric patients
+
+It evaluates available vital signs using the appropriate age-specific thresholds.
+
+It produces:
+
+```text
+Age group
+Vital status
+Critical flags
+Urgent flags
+Vital reasoning
+```
+
+For example:
+
+```text
+Temperature → Normal / Urgent / Critical
+Heart rate → Normal / Urgent / Critical
+Respiratory rate → Normal / Urgent / Critical
+SpO₂ → Normal / Urgent / Critical
+Blood pressure → Normal / Urgent / Critical
+Pain → Normal / Urgent / Critical
+```
+
+Pediatric blood pressure is separately interpreted using pediatric-specific logic.
+
+Importantly:
+
+> A critical or urgent vital flag is a **safety signal**, not an automatic ESI-1 decision.
+
+---
+
+# 6. Safety Engine
+
+The Safety Engine sits on top of the ML prediction.
+
+It answers a different question from the CatBoost model:
+
+> “Does the patient's overall presentation require a safety adjustment?”
+
+The system distinguishes between:
+
+```text
+NORMAL
+     ↓
+URGENT
+     ↓
+CRITICAL
+     ↓
+IMMEDIATE EMERGENCY
+```
+
+These categories are deliberately not treated as equivalent.
+
+## ESI-1
+
+ESI-1 is reserved for an obvious immediate life-threatening emergency.
+
+Examples include:
+
+- Unresponsive/unconscious patient
+- Not breathing
+- Cardiac arrest/no pulse
+- Severe respiratory compromise with appropriate clinical context
+- Profound hypoxia with concerning clinical context
+- Severe physiologic collapse
+- Other explicit life-threatening presentations
+
+A single `critical` flag does **not** automatically force ESI-1.
+
+For an emergency override:
+
+```text
+Final ESI: 1
+Emergency override: YES
+Confidence: HIDDEN
+```
+
+This prevents an ML probability from being presented as meaningful after the system has made a deterministic emergency safety decision.
+
+The system further recommends the coordinator to take the patient to care.
+
+---
+
+# 7. Dangerous Combinations
+
+The Safety Engine considers combinations of abnormal findings rather than treating every abnormality independently.
+
+For example:
+
+```text
+HR 140
+SpO₂ 84%
+RR 34
+SBP 86
+```
+
+is substantially more concerning than an isolated abnormal pain score.
+
+The system therefore uses:
+
+- Critical physiologic findings
+- Multiple critical findings
+- Clusters of urgent findings
+- Clinical context
+- Breathing status
+- Responsiveness
+- Distress
+- Complaint context
+
+to determine whether escalation is warranted.
+
+---
+
+# 8. Low-Acuity Safety Logic
+
+The system also addresses the opposite failure mode: unnecessarily high ML acuity for clearly stable patients.
+
+It does **not** use:
+
+```text
+if stable:
+    ESI = 4
+```
+
+Instead, a narrow low-acuity profile can adjust an ML prediction only when the complete presentation supports low acuity.
+
+The profile considers factors such as:
+
+- No immediate emergency
+- No critical physiologic combination
+- No concerning urgent cluster
+- Alert responsiveness
+- Normal breathing
+- Low distress
+- Low pain
+- Age-appropriate vital interpretation
+- Low-acuity complaint
+- Sufficient data completeness
+
+This allows cases such as a stable patient with a mild complaint to reach an appropriate low-acuity level without blindly overriding the model.
+
+The Vital Interpreter's underlying signal is still retained and displayed.
+
+---
+
+# 9. Prior History
+
+PatientTriage.ai does not treat every patient as an isolated encounter.
+
+When prior records are available, the system can incorporate relevant history context.
+
+For example:
+
+```text
+Known cardiac history
+        +
+Current chest-pain complaint
+        ↓
+Relevant history-risk signal
+        ↓
+Coordinator attention
+```
+
+History alone does not automatically lower or raise ESI.
+
+Instead, the history layer identifies clinically relevant combinations that should inform the coordinator's assessment.
+
+This is especially useful for returning patients who have substantially more information available than a first-time patient.
+
+---
+
+# 10. Facility-Aware Context
+
+Different healthcare facilities have different capabilities.
+
+PatientTriage.ai therefore includes a facility-context layer that can consider:
+
+- Facility type
+- Current ESI
+- Complaint/context
+
+and recommend a transfer when appropriate.
+
+Importantly:
+
+> Facility capability does not change the patient's ESI.
+
+A patient's clinical acuity remains the same whether they are in a rural emergency department, community facility, or larger trauma center.
+
+The facility layer answers:
+
+> “What should happen next?”
+
+rather than:
+
+> “What is the patient's ESI?”
+
+---
+
+# 11. Missing Data and Reliability
+
+Emergency-department intake data can be incomplete.
+
+PatientTriage.ai is designed not to crash when information is missing.
+
+The system explicitly reports:
+
+```text
+Data completeness
+Missing fields
+Decision reliability
+Clinician review required
+```
+
+For example:
+
+```text
+Data completeness: 16.7%
+Decision reliability: LOW
+Clinician review: REQUIRED
+```
+
+This prevents ML confidence from being confused with overall clinical certainty.
+
+The model probability remains available for transparency, but incomplete patient information automatically increases the need for human review.
+
+---
+
+# 12. Re-Triage
+
+PatientTriage.ai is not limited to the first triage decision.
+
+Patients can remain in the waiting queue while their condition changes.
+
+The system supports:
+
+```text
+Initial triage
+      ↓
+Waiting Queue
+      ↓
+Vitals change
+      ↓
+Re-triage
+      ↓
+Updated AI recommendation
+      ↓
+Coordinator review
+      ↓
+Confirm / Override
+```
+
+This addresses a major emergency-department problem:
+
+> A patient who was stable at intake may not remain stable while waiting.
+
+---
+
+# 13. Coordinator-in-the-Loop
+
+The system is intentionally not autonomous.
+
+The coordinator can:
+
+- Review the recommendation
+- Review history signals
+- Review transfer recommendations
+- Confirm the ESI
+- Override the recommendation
+- Provide an override reason
+- Move patients through the workflow
+
+The AI therefore functions as an **assistive decision-support layer**, while responsibility for the final operational decision remains with the appropriate healthcare professional.
+
+---
+
+# 14. Audit Trail
+
+Every important decision can be traced.
+
+The audit trail records:
+
+- AI recommendations
+- Safety decisions
+- Coordinator confirmations
+- Overrides
+- Who made the change
+- Why the change was made
+
+This creates an auditable history of how the triage recommendation evolved.
+
+That is particularly important when a patient's condition changes and the original recommendation is no longer appropriate.
+
+---
+
+# 15. Model Performance
+
+The current evaluation on MIMIC-IV Demo test data reports:
+
+| Metric | Result |
+|---|---:|
+| Accuracy | **92.27%** |
+| Under-triage | **2.90%** |
+| Severe under-triage | **0.00%** |
+| Over-triage | **4.83%** |
+| Severe over-triage | **0.97%** |
+| MAE | **0.087** |
+| Within ±1 ESI | **99.03%** |
+| ESI-1 recall | **88.89%** |
+| ESI-2 recall | **95.88%** |
+| ESI-3 recall | **91.11%** |
+
+The evaluation specifically emphasizes safety because under-triage can be more consequential than ordinary over-triage.
+
+The reported severe under-triage rate is **0.00%** on this evaluation.
+
+---
+
+# 16. Prototype Validation
+
+The system is tested against diverse edge cases rather than only average patients.
+
+The validation set includes:
+
+- Stable adults
+- Mild complaints
+- Chest pain with stable vitals
+- Immediate emergencies
+- Unresponsive patients
+- Stable pediatric patients
+- Severe pediatric presentations
+- Pediatric respiratory illness
+- Stable geriatric patients
+- Geriatric fever
+- Geriatric confusion
+- Dizziness/ambiguous complaints
+- Dangerous vitals with under-reported pain
+- Conflicting complaint and vital information
+- First-time/limited-history patients
+- Missing one vital
+- Multiple missing vitals
+- All vitals missing
+- Complaint-only cases
+- Almost entirely missing-data cases
+- Additional stable pediatric cases
+
+The validation deliberately checks that all five ESI levels remain reachable and that low-acuity patients are not automatically escalated merely because of age or an isolated warning signal.
+
+---
+
+# 18. The Demonstrated Product Workflow
+
+A coordinator can:
+
+1. Register a patient.
+2. Enter current patient information and available history.
+3. Run initial triage.
+4. Review the AI recommendation.
+5. Review relevant history context.
+6. Review any facility transfer recommendation.
+7. Confirm or override the recommendation.
+8. Place the patient in the Waiting Queue.
+9. Monitor the patient.
+10. Update vitals when the condition changes.
+11. Trigger re-triage.
+12. Review the updated recommendation.
+13. Move the patient into care.
+14. Complete the encounter.
+15. Review the audit trail.
+
+---
+
+# 18. What Makes PatientTriage.ai Different
+
+PatientTriage.ai is not simply:
+
+```text
+Patient → ML model → ESI
+```
+
+It is:
+
+```text
+Patient information
+       ↓
+ML prediction
+       +
+Age-aware vital interpretation
+       +
+Prior history
+       +
+Facility context
+       ↓
+Safety Engine
+       ↓
+Final ESI
+       ↓
+Human coordinator
+       ↓
+Re-triage when necessary
+       ↓
+Auditable decision history
+```
+
+This architecture allows the system to combine the strengths of machine learning with explicit safety logic, contextual information, and human oversight.
+
+---
+
+# 19. Regulatory and Safety Position
+
+PatientTriage.ai is currently an **academic/hackathon prototype**, not a validated medical device.
+
+It should not be presented as a replacement for licensed clinical judgment.
+
+For demonstration purposes, the system emphasizes:
+
+- Human-in-the-loop review
+- Explainability
+- Auditability
+- Conservative emergency safety logic
+- Explicit missing-data handling
+- Separation of prediction and safety decisions
+- Re-triage when patient conditions change
+
+Any real-world deployment would require appropriate clinical validation, regulatory assessment, privacy/security controls, institutional governance, and jurisdiction-specific compliance before clinical use.
+
+---
+
+# 20. Core Message
+
+> **PatientTriage.ai combines machine learning, age-aware vital interpretation, patient history, facility context, safety logic, continuous re-triage, and human oversight into one auditable emergency-department workflow.**
+
+The goal is not to replace clinicians.
+
+The goal is to help them **identify risk faster, understand why a patient was flagged, recognize deterioration while patients are waiting, and make better-informed triage decisions with a traceable record of what happened.**
