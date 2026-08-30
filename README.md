@@ -697,8 +697,6 @@ ML prediction
 Age-aware vital interpretation
        +
 Prior history
-       +
-Facility context
        ↓
 Safety Engine
        ↓
@@ -776,12 +774,9 @@ and override.
 
 **Q: Does patient history directly change the frozen CatBoost model?**
 
-**A:** No. Relevant history is handled as a separate context layer.
-
-**Q: Does facility capability change the patient's ESI?**
-
-**A:** No. Facility context can support a transfer recommendation, but it does not
-change the patient's clinical acuity.
+**A:** No. Relevant history is handled as a separate context layer. Later on, we 
+plan to integrate the history and retrain the model, so the model can be updated 
+with real data and improve it's real-time efficiency.
 
 **Q: Can the system re-triage a patient?**
 
