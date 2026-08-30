@@ -790,6 +790,6 @@ device or a substitute for licensed clinical judgment.
 ## Maintainers
 
 - Team Riwi
-- Team Leader: Kavya Mahajan, IIT Patna
-- Team Member: Riddhi Rajani, IIT Patna
+- Team Leader: Kavya Mahajan, IIT Patna.
+- Team Member: Riddhi Rajani, IIT Patna.
 
