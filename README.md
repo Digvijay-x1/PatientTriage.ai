@@ -1,25 +1,75 @@
 # PatientTriage.ai
-## AI-Assisted Emergency Department Triage Support System
 
-### 1. What is PatientTriage.ai?
+PatientTriage.ai is a prototype emergency-department coordination and triage-support
+platform designed to help healthcare coordinators prioritize patients, identify
+potentially deteriorating patients, and maintain a clear, auditable record of triage
+decisions.
 
-PatientTriage.ai is a prototype emergency-department coordination and triage-support platform designed to help healthcare coordinators prioritize patients, identify potentially deteriorating patients, and maintain a clear, auditable record of triage decisions.
+For this project, the README serves as the primary entry point for the prototype,
+including its architecture, model, safety logic, validation approach, workflow, and
+prototype limitations.
 
-It combines:
+## Table of contents
 
-- A frozen CatBoost-based ESI prediction model
-- Age-aware vital-sign interpretation
-- Critical and urgent safety flags
-- A dedicated safety engine
-- Prior-patient-history context
-- Facility-aware transfer recommendations
-- Automatic re-triage when patient conditions change
-- Coordinator review and override
-- Waiting Queue and Needs Attention workflows
-- In-Care patient tracking
-- An append-only audit trail
+- Requirements
+- Installation
+- Configuration
+- Project structure
+- Core AI architecture
+- Machine-learning model
+- Model inputs
+- Age-aware vital interpreter
+- Safety engine
+- Dangerous combinations
+- Low-acuity safety logic
+- Prior history
+- Facility-aware context
+- Missing data and reliability
+- Re-triage
+- Coordinator-in-the-loop
+- Audit trail
+- Model performance
+- Prototype validation
+- Demonstrated product workflow
+- What makes PatientTriage.ai different
+- Regulatory and safety position
+- Core message
+- Troubleshooting
+- FAQ
+- Maintainers
 
-The system is designed as **decision support**, not autonomous clinical decision-making. It does not replace diagnosis, treatment, or qualified clinician judgment.
+---
+
+## Tech Stack
+
+### Backend
+- Python
+- Flask
+- SQLAlchemy
+- SQLite
+- Scikit-learn
+- Pandas
+- Joblib
+
+### Frontend
+- React
+- TypeScript
+- Tailwind CSS
+
+---
+
+## Requirements
+
+PatientTriage.ai is a prototype application with a machine-learning component,
+backend/integration logic, and a frontend. The exact runtime dependencies should be
+installed from the dependency files included with the project.
+
+The prototype also requires the frozen CatBoost model artifact and its associated
+vital-threshold configuration to be available at runtime.
+
+No clinical deployment requirements are implied by this prototype README. Any
+production deployment would require additional clinical, security, privacy,
+infrastructure, regulatory, and institutional requirements.
 
 ---
 
@@ -50,8 +100,93 @@ PatientTriage/
 
 ---
 
+## Installation
 
-# 2. The Core AI Architecture
+## Setup
+
+### Backend
+
+```bash
+cd backend
+python -m venv venv
+```
+
+Windows:
+
+```bash
+venv\Scripts\activate
+```
+
+Linux/macOS:
+
+```bash
+source venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Set the Gemini API key according to the configuration used by `GeminiExplanationService`.
+
+Start Flask:
+
+```bash
+python app.py
+```
+
+Backend:
+
+`http://127.0.0.1:5000`
+
+### Frontend
+
+Open a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open the URL shown by Vite, usually:
+
+`http://localhost:5173`
+
+---
+
+## Running the Demo
+
+1. Register a patient.
+2. Run initial triage.
+3. Review the ML ESI recommendation.
+4. Confirm or override the recommendation.
+5. Monitor the patient in the Waiting Queue.
+6. Update vitals to trigger re-triage.
+7. Review the new AI recommendation and safety flags.
+8. Move the patient to In Care when required.
+9. Mark the patient as completed.
+10. Review decisions in the Audit Trail.
+
+---
+
+## Configuration
+
+The prototype configuration includes the model artifact, vital-threshold
+configuration, backend services, frontend application, patient-history context,
+and audit logging.
+
+The age-aware Vital Interpreter uses its configured thresholds to distinguish
+pediatric, adult, and geriatric interpretation.
+
+The CatBoost model is intentionally kept frozen. Deployment-context features such
+as history and facility context are handled outside the frozen model.
+
+
+
+## 2. The Core AI Architecture
 
 PatientTriage.ai deliberately separates machine learning from safety and clinical context.
 
@@ -70,20 +205,20 @@ PatientTriage.ai deliberately separates machine learning from safety and clinica
                          ▼
                   ML ESI + PROBS
                          │
-          ┌──────────────┼──────────────┐
-          │              │              │
-          ▼              ▼              ▼
-     Vital Safety    Patient History   Facility
-     Interpreter       Context          Context
-          │              │              │
-          ▼              ▼              ▼
-    Critical/urgent   Relevant risk   Transfer/
-       flags           signals        destination
-          │              │              │
-          └──────────────┼──────────────┘
+          ┌──────────────
+          │              │             
+          ▼              ▼             
+     Vital Safety    Patient History   
+     Interpreter       Context          
+          │              │             
+          ▼              ▼            
+    Critical/urgent   Relevant risk  
+       flags           signals        
+          │              │            
+          └──────────────┼
                          ▼
                  ┌───────────────┐
-                 │ SAFETY ENGINE  │
+                 │ SAFETY ENGINE │
                  │               │
                  │ Emergency?    │
                  │ Dangerous     │
@@ -117,7 +252,7 @@ The key design principle is that **the ML model, Vital Interpreter, history cont
 
 ---
 
-# 3. Machine-Learning Model
+## 3. Machine-Learning Model
 
 The core prediction model is a **frozen, regression-tested CatBoost model**.
 
@@ -145,7 +280,7 @@ The model itself is intentionally kept frozen so that deployment-context feature
 
 ---
 
-# 4. Model Inputs
+## 4. Model Inputs
 
 The verified CatBoost integration schema contains these 12 inputs:
 
@@ -170,7 +305,7 @@ Patient history and facility information are handled by separate context layers 
 
 ---
 
-# 5. Age-Aware Vital Interpreter
+## 5. Age-Aware Vital Interpreter
 
 PatientTriage.ai does not interpret every patient's vital signs using one generic adult threshold.
 
@@ -211,7 +346,7 @@ Importantly:
 
 ---
 
-# 6. Safety Engine
+## 6. Safety Engine
 
 The Safety Engine sits on top of the ML prediction.
 
@@ -233,7 +368,7 @@ IMMEDIATE EMERGENCY
 
 These categories are deliberately not treated as equivalent.
 
-## ESI-1
+### ESI-1
 
 ESI-1 is reserved for an obvious immediate life-threatening emergency.
 
@@ -263,7 +398,7 @@ The system further recommends the coordinator to take the patient to care.
 
 ---
 
-# 7. Dangerous Combinations
+## 7. Dangerous Combinations
 
 The Safety Engine considers combinations of abnormal findings rather than treating every abnormality independently.
 
@@ -293,7 +428,7 @@ to determine whether escalation is warranted.
 
 ---
 
-# 8. Low-Acuity Safety Logic
+## 8. Low-Acuity Safety Logic
 
 The system also addresses the opposite failure mode: unnecessarily high ML acuity for clearly stable patients.
 
@@ -325,7 +460,7 @@ The Vital Interpreter's underlying signal is still retained and displayed.
 
 ---
 
-# 9. Prior History
+## 9. Prior History
 
 PatientTriage.ai does not treat every patient as an isolated encounter.
 
@@ -351,7 +486,7 @@ This is especially useful for returning patients who have substantially more inf
 
 ---
 
-# 10. Facility-Aware Context
+## 10. Facility-Aware Context
 
 Different healthcare facilities have different capabilities.
 
@@ -369,17 +504,9 @@ Importantly:
 
 A patient's clinical acuity remains the same whether they are in a rural emergency department, community facility, or larger trauma center.
 
-The facility layer answers:
-
-> “What should happen next?”
-
-rather than:
-
-> “What is the patient's ESI?”
-
 ---
 
-# 11. Missing Data and Reliability
+## 11. Missing Data and Reliability
 
 Emergency-department intake data can be incomplete.
 
@@ -408,7 +535,7 @@ The model probability remains available for transparency, but incomplete patient
 
 ---
 
-# 12. Re-Triage
+## 12. Re-Triage
 
 PatientTriage.ai is not limited to the first triage decision.
 
@@ -438,7 +565,7 @@ This addresses a major emergency-department problem:
 
 ---
 
-# 13. Coordinator-in-the-Loop
+## 13. Coordinator-in-the-Loop
 
 The system is intentionally not autonomous.
 
@@ -456,7 +583,7 @@ The AI therefore functions as an **assistive decision-support layer**, while res
 
 ---
 
-# 14. Audit Trail
+## 14. Audit Trail
 
 Every important decision can be traced.
 
@@ -475,7 +602,7 @@ That is particularly important when a patient's condition changes and the origin
 
 ---
 
-# 15. Model Performance
+## 15. Model Performance
 
 The current evaluation on MIMIC-IV Demo test data reports:
 
@@ -498,7 +625,7 @@ The reported severe under-triage rate is **0.00%** on this evaluation.
 
 ---
 
-# 16. Prototype Validation
+## 16. Prototype Validation
 
 The system is tested against diverse edge cases rather than only average patients.
 
@@ -530,7 +657,7 @@ The validation deliberately checks that all five ESI levels remain reachable and
 
 ---
 
-# 18. The Demonstrated Product Workflow
+## 18. The Demonstrated Product Workflow
 
 A coordinator can:
 
@@ -552,7 +679,7 @@ A coordinator can:
 
 ---
 
-# 18. What Makes PatientTriage.ai Different
+## 18. What Makes PatientTriage.ai Different
 
 PatientTriage.ai is not simply:
 
@@ -588,7 +715,7 @@ This architecture allows the system to combine the strengths of machine learning
 
 ---
 
-# 19. Regulatory and Safety Position
+## 19. Regulatory and Safety Position
 
 PatientTriage.ai is currently an **academic/hackathon prototype**, not a validated medical device.
 
@@ -608,10 +735,66 @@ Any real-world deployment would require appropriate clinical validation, regulat
 
 ---
 
-# 20. Core Message
+## 20. Core Message
 
 > **PatientTriage.ai combines machine learning, age-aware vital interpretation, patient history, facility context, safety logic, continuous re-triage, and human oversight into one auditable emergency-department workflow.**
 
 The goal is not to replace clinicians.
 
 The goal is to help them **identify risk faster, understand why a patient was flagged, recognize deterioration while patients are waiting, and make better-informed triage decisions with a traceable record of what happened.**
+
+## Troubleshooting
+
+If the prototype does not produce a prediction:
+
+- Confirm that the required model artifact is available.
+- Confirm that the vital-threshold configuration is available.
+- Check that all required runtime dependencies are installed.
+- Check the backend/application logs for the underlying error.
+- Verify that the frontend is sending the expected input fields and values.
+
+If a patient has incomplete data, review the reported data completeness,
+decision reliability, missing fields, and clinician-review requirement rather than
+treating model confidence as clinical certainty.
+
+If a safety decision differs from the raw ML prediction, review the Vital
+Interpreter output and Safety Engine reasoning. The architecture intentionally
+keeps these decision sources separate.
+
+## FAQ
+
+**Q: Does a critical vital flag automatically mean ESI-1?**
+
+**A:** No. A critical or urgent vital flag is a safety signal. ESI-1 is reserved
+for an obvious immediate life-threatening emergency under the prototype's safety
+logic.
+
+**Q: Does the system replace a clinician?**
+
+**A:** No. PatientTriage.ai is decision support and includes coordinator review
+and override.
+
+**Q: Does patient history directly change the frozen CatBoost model?**
+
+**A:** No. Relevant history is handled as a separate context layer.
+
+**Q: Does facility capability change the patient's ESI?**
+
+**A:** No. Facility context can support a transfer recommendation, but it does not
+change the patient's clinical acuity.
+
+**Q: Can the system re-triage a patient?**
+
+**A:** Yes. The prototype supports re-triage when patient conditions change.
+
+**Q: Is PatientTriage.ai clinically validated?**
+
+**A:** No. It is an academic/hackathon prototype and is not a validated medical
+device or a substitute for licensed clinical judgment.
+
+## Maintainers
+
+- Team Riwi
+- Team Leader: Kavya Mahajan, IIT Patna
+- Team Member: Riddhi Rajani, IIT Patna
+
