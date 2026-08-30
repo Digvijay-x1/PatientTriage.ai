@@ -15,10 +15,6 @@ from services.retriage_service import (
 from models.patient import Patient
 from models.retriage_alert import RetriageAlert
 
-from services.gemini_service import GeminiExplanationService
-
-# Instantiate once, reused across requests
-gemini_explanation_service = GeminiExplanationService()
 
 coordinator_bp = Blueprint('coordinator', __name__, url_prefix='/api')
 
@@ -60,6 +56,7 @@ def explain_assessment(assessment_id):
             'bp_diastolic': patient.bp_diastolic,
             'heart_rate': patient.heart_rate,
             'temperature': patient.temperature,
+            'pain': patient.pain,
             'respiratory_rate': patient.respiratory_rate,
             'responsiveness': patient.responsiveness,
             'breathing': patient.breathing,
@@ -77,14 +74,9 @@ def explain_assessment(assessment_id):
                 assessment.auto_escalate_for_review,
         }
 
-        explanation = gemini_explanation_service.explain_triage(
-            patient_payload,
-            assessment_payload,
-        )
 
         return jsonify({
             'assessment_id': assessment.id,
-            'explanation': explanation,
         }), 200
 
     except Exception as e:
