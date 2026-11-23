@@ -34,6 +34,7 @@ def create_app(config_class=DevelopmentConfig):
     from models.coordinator_decision import CoordinatorDecision
     from models.audit_log import AuditLog
     from models.retriage_alert import RetriageAlert
+    from models.incident_report import IncidentReport
 
     # Register blueprints
     from routes.patient_intake import intake_bp
@@ -41,6 +42,7 @@ def create_app(config_class=DevelopmentConfig):
     from routes.coordinator_review import coordinator_bp
     from routes.audit_trail import audit_bp
     from routes.retriage import retriage_bp
+    from routes.incident_reports import incident_bp
     
 
     app.register_blueprint(intake_bp)
@@ -48,6 +50,7 @@ def create_app(config_class=DevelopmentConfig):
     app.register_blueprint(coordinator_bp)
     app.register_blueprint(audit_bp)
     app.register_blueprint(retriage_bp)
+    app.register_blueprint(incident_bp)
     
 
     # Create database tables

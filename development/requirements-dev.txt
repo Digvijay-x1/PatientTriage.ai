@@ -1,0 +1,3 @@
+# Test dependencies, used by continuous integration
+-r requirements.txt
+pytest==8.4.1

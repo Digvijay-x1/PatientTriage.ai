@@ -16,6 +16,8 @@ import {
 
 import type { RetriageAlert } from "../types/patient";
 import HospitalCapacity from "../components/HospitalCapacity";
+import AiDisclosure from "../components/AiDisclosure";
+import ProviderFooter from "../components/ProviderFooter";
 
 function Dashboard() {
   const [alerts, setAlerts] = useState<RetriageAlert[]>([]);
@@ -344,6 +346,9 @@ useEffect(() => {
 
     <main className="w-full py-4 sm:py-6">
   <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
+
+        {/* Shown on every tab, before any interaction */}
+        <AiDisclosure />
 
         <TabsContent
           value="overview"
@@ -775,6 +780,8 @@ useEffect(() => {
 </TabsContent>
   </div>
         </main>
+
+        <ProviderFooter />
 
 
         {/* ====================================================

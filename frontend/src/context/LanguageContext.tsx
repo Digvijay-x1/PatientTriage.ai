@@ -290,6 +290,34 @@ const translations: Record<string, string> = {
 "ED Live":
   "ED लाइव",
   "Triage Load": "ट्रायेज़ लोड",
+
+  // AI system notice
+  "AI system notice": "AI प्रणाली सूचना",
+  "AI system": "AI प्रणाली",
+  "You are interacting with an AI system, not a person.":
+    "आप किसी व्यक्ति से नहीं, एक AI प्रणाली से बातचीत कर रहे हैं।",
+  "The ESI recommendations in PatientTriage.ai come from a machine-learning model. A coordinator checks every recommendation and decides the patient's priority.":
+    "PatientTriage.ai में ESI सुझाव एक मशीन-लर्निंग मॉडल से आते हैं। समन्वयक हर सुझाव की जाँच करता है और मरीज़ की प्राथमिकता तय करता है।",
+
+  // Legal notice
+  "Legal notice": "कानूनी सूचना",
+  "version": "संस्करण",
+  "Provider": "प्रदाता",
+  "the Netherlands": "नीदरलैंड",
+  "EU database registration": "EU डेटाबेस पंजीकरण",
+  "CE marking": "CE चिह्न",
+  "CE marked high-risk AI system under Regulation (EU) 2024/1689.":
+    "विनियमन (EU) 2024/1689 के अंतर्गत CE चिह्नित उच्च-जोखिम AI प्रणाली।",
+
+  // Problem reports
+  "Report a problem with this AI recommendation": "इस AI सुझाव में समस्या की रिपोर्ट करें",
+  "What went wrong?": "क्या गलत हुआ?",
+  "Describe what went wrong.": "बताएँ कि क्या गलत हुआ।",
+  "A patient was or may have been harmed": "किसी मरीज़ को नुकसान हुआ है या हो सकता है",
+  "Send report": "रिपोर्ट भेजें",
+  "Sending...": "भेजा जा रहा है...",
+  "Unable to send the report": "रिपोर्ट नहीं भेजी जा सकी",
+  "Thank you. The report was sent to the provider.": "धन्यवाद। रिपोर्ट प्रदाता को भेज दी गई।",
 };
 
 const LanguageContext = createContext<LanguageContextType | null>(null);

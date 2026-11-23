@@ -1,0 +1,17 @@
+# Owners of PatientTriage.ai (see docs/compliance/quality-management-system.md,
+# section 12, accountability). A pull request needs approval from the owner
+# of every path it changes.
+
+*                                   @nekod-testlabs/patienttriage-maintainers
+
+# Model, Safety Engine and thresholds: Clinical ML lead
+/development/ml/                    @nekod-testlabs/clinical-ml
+/development/services/              @nekod-testlabs/clinical-ml
+/development/requirements*.txt      @nekod-testlabs/clinical-ml
+
+# Coordinator dashboard, AI notice and legal notice
+/frontend/                          @nekod-testlabs/frontend
+
+# Compliance file, QMS and risk management: Quality and regulatory lead
+/docs/compliance/                   @nekod-testlabs/quality-regulatory
+/.github/                           @nekod-testlabs/quality-regulatory

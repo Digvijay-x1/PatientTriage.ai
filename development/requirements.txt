@@ -1,13 +1,19 @@
-Flask>=3.1,<4
-Flask-SQLAlchemy>=3.1,<4
-SQLAlchemy>=2.0.36,<3
-python-dateutil>=2.9,<3
-requests>=2.32,<3
-numpy>=2.1,<3
-pandas>=2.2.3,<3
-Werkzeug>=3.1,<4
-flask-cors>=5,<7
-
+# Runtime dependencies, pinned to exact versions (QMS section 11, resource
+# management). Change a pin only through the change procedure in
+# docs/compliance/quality-management-system.md.
+Flask==3.1.1
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.41
+python-dateutil==2.9.0.post0
+requests==2.32.4
+numpy==2.2.6
+pandas==2.2.3
+Werkzeug==3.1.3
+flask-cors==6.0.1
+joblib==1.5.1
+# The frozen model ml/catboost_esi_model_v3.joblib was trained and saved
+# with CatBoost 1.2.8. Load it with the same version.
+catboost==1.2.8
 
 # Optional semantic complaint-matching fallback
 # Keep commented out for now

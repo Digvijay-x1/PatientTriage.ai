@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import AiDisclosure from "./AiDisclosure";
 
 type PatientIntakeProps = {
   open: boolean;
@@ -186,6 +187,8 @@ const hasPriorRecord = historyCardiac || historyRespiratory || historyDiabetes |
 <p className="mt-1 text-sm text-slate-500">
   {t("Capture the information available during the patient's initial arrival.")}
 </p>
+
+<AiDisclosure compact />
         </DialogHeader>
 
         {/* Scrollable body */}

@@ -11,6 +11,7 @@ import {
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { useLanguage } from "../context/LanguageContext";
+import AiDisclosure from "./AiDisclosure";
 type PatientQueueProps = {
   refreshKey: number;
   onRetriageTriggered: () => void;
@@ -494,6 +495,8 @@ const [pain, setPain] = useState("");
         {t("Close")}
       </button>
     </div>
+
+    <AiDisclosure compact />
 
     {/* Mode switcher */}
     {phase === "form" && (

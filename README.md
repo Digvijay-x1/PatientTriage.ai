@@ -1,13 +1,20 @@
 # PatientTriage.ai
 
-PatientTriage.ai is a prototype emergency-department coordination and triage-support
+PatientTriage.ai is an emergency-department coordination and triage-support
 platform designed to help healthcare coordinators prioritize patients, identify
 potentially deteriorating patients, and maintain a clear, auditable record of triage
 decisions.
 
-For this project, the README serves as the primary entry point for the prototype,
-including its architecture, model, safety logic, validation approach, workflow, and
-prototype limitations.
+## Provider
+
+PatientTriage.ai is provided by **Nekod Test Labs B.V.**, Keizersgracht 100,
+1015 CW Amsterdam, the Netherlands (compliance@nekod-testlabs.example). Nekod Test
+Labs B.V. is the provider under Regulation (EU) 2024/1689 and places release 1.0.0
+on the market. The compliance file, including the instructions for use and the EU
+declaration of conformity, is in `docs/compliance/`.
+
+This README covers the system's architecture, model, safety logic, validation
+approach, workflow and limitations.
 
 ## Table of contents
 
@@ -29,7 +36,7 @@ prototype limitations.
 - Coordinator-in-the-loop
 - Audit trail
 - Model performance
-- Prototype validation
+- Edge-case validation
 - Demonstrated product workflow
 - What makes PatientTriage.ai different
 - Regulatory and safety position
@@ -60,16 +67,15 @@ prototype limitations.
 
 ## Requirements
 
-PatientTriage.ai is a prototype application with a machine-learning component,
-backend/integration logic, and a frontend. The exact runtime dependencies should be
-installed from the dependency files included with the project.
+PatientTriage.ai has a machine-learning component, backend/integration logic, and a
+frontend. Install the pinned runtime dependencies from `development/requirements.txt`
+and `frontend/package-lock.json`.
 
-The prototype also requires the frozen CatBoost model artifact and its associated
-vital-threshold configuration to be available at runtime.
+The system requires the frozen CatBoost model artifact and its associated
+vital-threshold configuration at runtime.
 
-No clinical deployment requirements are implied by this prototype README. Any
-production deployment would require additional clinical, security, privacy,
-infrastructure, regulatory, and institutional requirements.
+Deployment conditions (internal network only, behind the hospital's access control)
+are in `docs/compliance/instructions-for-use.md`.
 
 ---
 
@@ -85,7 +91,7 @@ PatientTriage/
 │   ├── instances/
 │   │   ├── db
 │   ├── ml/
-│   │   ├── catboost_esi_model_v2.joblib
+│   │   ├── catboost_esi_model_v3.joblib
 │   │   ├── vitals_thresholds.json
 │   │   ├── history_context.py
 │   │   └── audit_log.py
@@ -174,7 +180,7 @@ Open the URL shown by Vite, usually:
 
 ## Configuration
 
-The prototype configuration includes the model artifact, vital-threshold
+The configuration includes the model artifact, vital-threshold
 configuration, backend services, frontend application, patient-history context,
 and audit logging.
 
@@ -257,7 +263,7 @@ The key design principle is that **the ML model, Vital Interpreter, history cont
 The core prediction model is a **frozen, regression-tested CatBoost model**.
 
 ```text
-catboost_esi_model_v2.joblib
+catboost_esi_model_v3.joblib
 ```
 
 It predicts the Emergency Severity Index across all five levels:
@@ -625,7 +631,7 @@ The reported severe under-triage rate is **0.00%** on this evaluation.
 
 ---
 
-## 16. Prototype Validation
+## 16. Edge-case Validation
 
 The system is tested against diverse edge cases rather than only average patients.
 
@@ -715,11 +721,15 @@ This architecture allows the system to combine the strengths of machine learning
 
 ## 19. Regulatory and Safety Position
 
-PatientTriage.ai is currently an **academic/hackathon prototype**, not a validated medical device.
+PatientTriage.ai is a **high-risk AI system** under Regulation (EU) 2024/1689,
+Annex III point 5(d) (emergency healthcare patient triage). Nekod Test Labs B.V. is
+its provider. Release 1.0.0 passed an internal-control conformity assessment on
+2026-06-05, carries the CE marking, and is registered in the EU database
+(EUDB-HR-2026-0042-PT). See `docs/compliance/README.md`.
 
-It should not be presented as a replacement for licensed clinical judgment.
+It is not a replacement for licensed clinical judgment.
 
-For demonstration purposes, the system emphasizes:
+The system emphasizes:
 
 - Human-in-the-loop review
 - Explainability
@@ -729,7 +739,8 @@ For demonstration purposes, the system emphasizes:
 - Separation of prediction and safety decisions
 - Re-triage when patient conditions change
 
-Any real-world deployment would require appropriate clinical validation, regulatory assessment, privacy/security controls, institutional governance, and jurisdiction-specific compliance before clinical use.
+Each hospital that deploys it follows the instructions for use and keeps its own
+institutional governance for clinical use.
 
 ---
 
@@ -743,7 +754,7 @@ The goal is to help them **identify risk faster, understand why a patient was fl
 
 ## Troubleshooting
 
-If the prototype does not produce a prediction:
+If the system does not produce a prediction:
 
 - Confirm that the required model artifact is available.
 - Confirm that the vital-threshold configuration is available.
@@ -764,7 +775,7 @@ keeps these decision sources separate.
 **Q: Does a critical vital flag automatically mean ESI-1?**
 
 **A:** No. A critical or urgent vital flag is a safety signal. ESI-1 is reserved
-for an obvious immediate life-threatening emergency under the prototype's safety
+for an obvious immediate life-threatening emergency under the system's safety
 logic.
 
 **Q: Does the system replace a clinician?**
@@ -780,14 +791,22 @@ with real data and improve it's real-time efficiency.
 
 **Q: Can the system re-triage a patient?**
 
-**A:** Yes. The prototype supports re-triage when patient conditions change.
+**A:** Yes. The system supports re-triage when patient conditions change.
 
 **Q: Is PatientTriage.ai clinically validated?**
 
-**A:** No. It is an academic/hackathon prototype and is not a validated medical
-device or a substitute for licensed clinical judgment.
+**A:** It was validated on the MIMIC-IV-ED Demo test split and the edge-case set
+above (sections 15 and 16). It is not a substitute for licensed clinical judgment.
+
+**Q: Who is the provider, and how do I report a problem?**
+
+**A:** Nekod Test Labs B.V., Keizersgracht 100, 1015 CW Amsterdam, the Netherlands.
+Use "Report a problem with this AI recommendation" in the Coordinator Review dialog,
+or write to compliance@nekod-testlabs.example.
 
 ## Maintainers
+
+The original prototype was written by:
 
 - Team Riwi
 - Team Leader: Kavya Mahajan, IIT Patna.

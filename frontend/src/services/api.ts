@@ -288,6 +288,31 @@ export async function getAuditTrail(): Promise<{
   }>("/audit-trail");
 }
 
+// ======================================
+// PROBLEM REPORTS ON AI RECOMMENDATIONS
+// POST /api/incident-reports
+// ======================================
+
+export async function reportIncident(payload: {
+  patient_id: number | null;
+  assessment_id: number | null;
+  description: string;
+  patient_harmed: boolean;
+}): Promise<{
+  success: boolean;
+  incident_id: number;
+  possible_serious_incident: boolean;
+}> {
+  return request<{
+    success: boolean;
+    incident_id: number;
+    possible_serious_incident: boolean;
+  }>("/incident-reports", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function completePatient(
   patientId: number,
 ): Promise<{

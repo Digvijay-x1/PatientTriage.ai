@@ -1,0 +1,40 @@
+# Release tests for PatientTriage.ai (QMS section 5).
+# Runs on every push and pull request, and every Monday at 06:00 UTC so a
+# change in the environment shows up even when the code did not change.
+name: ci
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Check the frozen model is the released one
+        run: echo "b18fa75c2acf6cd294a9f192dc01235221a240ab5205b0fa53a22437d2d41475  ml/catboost_esi_model_v3.joblib" | sha256sum --check
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest tests -q
+
+  frontend-build:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build

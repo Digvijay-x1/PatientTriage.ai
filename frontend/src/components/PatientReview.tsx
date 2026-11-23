@@ -9,6 +9,8 @@ import {
 import { getAssessmentExplanation } from "../services/api";
 import type { TriageAssessment, EsiLevel, ConfidenceBand } from "../types/patient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import AiDisclosure from "./AiDisclosure";
+import ReportProblem from "./ReportProblem";
 type PatientReviewProps = {
   patientId: string;
   onClose: () => void;
@@ -310,6 +312,8 @@ onDecisionComplete();
         <p className="mt-1 text-sm text-slate-500">
           {t("Patient")} {patientId}
         </p>
+
+        <AiDisclosure compact />
       </DialogHeader>
 
       {/* ================= SCROLLABLE CONTENT ================= */}
@@ -686,6 +690,11 @@ onDecisionComplete();
               {/* ================= REASONING ================= */}
 
               <AssessmentReasoning assessment={assessment} />
+
+              <ReportProblem
+                patientId={Number(patientId)}
+                assessmentId={assessment.assessment_id}
+              />
 
               {/* ================= COORDINATOR DECISION ================= */}
 

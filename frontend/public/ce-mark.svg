@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" role="img" aria-labelledby="ce-title">
+  <title id="ce-title">CE marking</title>
+  <g fill="none" stroke="#0f172a" stroke-width="10">
+    <path d="M 50 5 A 45 45 0 0 0 50 95" />
+    <path d="M 150 5 A 45 45 0 0 0 150 95" />
+    <path d="M 108 50 L 144 50" />
+  </g>
+</svg>
